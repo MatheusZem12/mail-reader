@@ -1,0 +1,6 @@
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/MailReaderBackendApplication.java
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/controller/EmailController.java
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/dto/EmailAccountDto.java
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/dto/EmailDetailDto.java
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/dto/EmailSummaryDto.java
+/home/matheus/Documents/pessoal/mail-reader/mail-reader-backend/src/main/java/com/mailreader/mailreaderbackend/service/EmailService.java
