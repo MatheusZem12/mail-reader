@@ -1,27 +1,17 @@
-# Backend
-mail-reader-backend/target/
-mail-reader-backend/.idea/
-mail-reader-backend/*.iml
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
-# Frontend
-mail-reader-frontend/build/
-mail-reader-frontend/.dart_tool/
-mail-reader-frontend/.idea/
-mail-reader-frontend/*.iml
-mail-reader-frontend/.flutter-plugins
-mail-reader-frontend/.flutter-plugins-dependencies
-mail-reader-frontend/.metadata
-mail-reader-frontend/android/.gradle/
-mail-reader-frontend/android/app/debug/
-mail-reader-frontend/android/app/profile/
-mail-reader-frontend/android/app/release/
-mail-reader-frontend/ios/Pods/
-mail-reader-frontend/ios/.symlinks/
-mail-reader-frontend/macos/Pods/
-mail-reader-frontend/macos/.symlinks/
-mail-reader-frontend/windows/flutter/ephemeral/
-mail-reader-frontend/linux/flutter/ephemeral/
+# Electron
+dist/
+out/
 
-# Geral
+# Segredos / configuração local
+.env
+
+# Sistema
 .DS_Store
 *.log
