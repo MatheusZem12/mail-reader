@@ -1,0 +1,27 @@
+{
+  "name": "mail-reader",
+  "version": "1.0.0",
+  "description": "Leitor de e-mail local com Electron e Node.js",
+  "main": "electron.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "email",
+    "gmail",
+    "outlook",
+    "electron",
+    "desktop"
+  ],
+  "author": "Matheus <matheuslajazem@gmail.com>",
+  "license": "SEE LICENSE IN TERMOS-DE-USO.md",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.0",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0"
+  }
+}

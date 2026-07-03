@@ -1,6 +1,0 @@
-com/mailreader/mailreaderbackend/service/EmailService.class
-com/mailreader/mailreaderbackend/controller/EmailController.class
-com/mailreader/mailreaderbackend/dto/EmailSummaryDto.class
-com/mailreader/mailreaderbackend/dto/EmailDetailDto.class
-com/mailreader/mailreaderbackend/MailReaderBackendApplication.class
-com/mailreader/mailreaderbackend/dto/EmailAccountDto.class
