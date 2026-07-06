@@ -345,14 +345,17 @@ body {
   color: var(--error);
 }
 
-/* App header */
+/* App header — três faixas: título (esquerda), busca+filtro (centro), ações (direita).
+   O grid 1fr / centro / 1fr mantém o bloco de busca de fato centralizado na
+   barra, independentemente da largura do título e das ações. */
 .app-header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 12px 20px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr clamp(260px, 42vw, 540px) 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   flex-shrink: 0;
 }
 
@@ -362,9 +365,20 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  justify-self: start;
+}
+
+/* Busca e botão de filtro sempre lado a lado e centralizados no topbar. */
+.header-center {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .app-header-actions {
+  justify-self: end;
   display: flex;
   gap: 8px;
 }
@@ -419,8 +433,7 @@ body {
 /* Busca no header */
 .search-box {
   flex: 1;
-  max-width: 480px;
-  margin: 0 16px;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -488,12 +501,28 @@ body {
   background: var(--primary);
 }
 
+/* Nav de pastas/abas. Quando surgem muitas abas (ex.: várias automações no
+   futuro) elas não quebram linha: viram uma faixa rolável na horizontal. */
 .folder-tabs {
   display: flex;
   gap: 4px;
   padding: 8px 10px 0;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.folder-tabs::-webkit-scrollbar {
+  height: 5px;
+}
+
+.folder-tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .folder-tab {
@@ -504,6 +533,8 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   padding: 6px 12px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .folder-tab:hover {
@@ -520,6 +551,7 @@ body {
    calendário + ordem de exibição — só abre quando clicado. */
 .filter-wrap {
   position: relative;
+  flex-shrink: 0;
 }
 
 .filter-toggle-btn {
@@ -875,6 +907,118 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Aba Automatizador — regras de limpeza salvas */
+.automation-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.automation-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.automation-row.open {
+  background: rgba(25, 118, 210, 0.08);
+}
+
+.automation-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.automation-row-line1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.automation-row-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automation-row-line2 {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.automation-row .row-action {
+  padding: 4px;
+  flex-shrink: 0;
+  color: var(--error);
+}
+
+.automation-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--primary);
+}
+
+/* Formulário de criar/editar automação (no painel de leitura) */
+.automation-form {
+  max-width: 460px;
+}
+
+.automation-form .form-group input {
+  font-size: 14px;
+}
+
+.automation-form-help {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -4px 0 16px;
+  line-height: 1.5;
+}
+
+.automation-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.automation-empty-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.rule-run-status {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-height: 20px;
+}
+
+.rule-run-status.success {
+  color: #2e7d32;
+}
+
+.rule-run-status.error {
+  color: var(--error);
+}
+
+.rule-run-status .spinner-small {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 8px 0 0;
 }
 
 /* Painel de leitura */

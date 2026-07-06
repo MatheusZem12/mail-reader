@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteEmail: (emailId, options) => ipcRenderer.invoke('delete-email', emailId, options),
   restoreEmail: (emailId, options) => ipcRenderer.invoke('restore-email', emailId, options),
   emptyTrash: () => ipcRenderer.invoke('empty-trash'),
+  getAutomationRules: () => ipcRenderer.invoke('get-automation-rules'),
+  saveAutomationRule: (rule) => ipcRenderer.invoke('save-automation-rule', rule),
+  deleteAutomationRule: (id) => ipcRenderer.invoke('delete-automation-rule', id),
   getBodyZoom: () => ipcRenderer.invoke('get-body-zoom'),
   setBodyZoom: (value) => ipcRenderer.invoke('set-body-zoom', value),
   onZoomChange: (callback) => {
