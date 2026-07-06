@@ -9,7 +9,7 @@ Leitor de e-mail local com **Electron + Node.js**. Não há backend remoto: a co
 1. **Primeiro acesso:** o app mostra os Termos de Uso (aceitar para continuar) e depois a tela **"Configurar OAuth"**, com tutorial passo a passo.
 2. **Você cria suas próprias credenciais** OAuth no Google/Microsoft (uma única vez, gratuito), cola os códigos nos campos e o app salva tudo **no `.env` local da sua máquina** — nada vem embutido, nada é enviado para fora.
 3. Daí em diante é só clicar em **"Entrar com Google"** ou **"Entrar com Outlook"**: o navegador abre na tela oficial do provedor, você autoriza, e pronto.
-4. A caixa de entrada unificada mostra os e-mails de todas as contas, com painel de leitura lateral, busca e seleção múltipla.
+4. A caixa de entrada unificada mostra os e-mails de todas as contas, com painel de leitura lateral, busca e seleção múltipla, além de abas para **Lixeira**, **Domínios** (de quais sites/serviços você recebe e-mail) e **Automatizador** (regras de limpeza em massa).
 
 ## Requisitos
 
@@ -19,7 +19,7 @@ Leitor de e-mail local com **Electron + Node.js**. Não há backend remoto: a co
 ## Estrutura do projeto
 
 - `source/` — todo o código do app (Electron + Node.js)
-- `README.md`, `TERMOS-DE-USO.md`, `start.sh` — documentação e scripts, na raiz
+- `README.md`, `TERMOS-DE-USO.md`, `start.sh`, `install-desktop.sh` — documentação e scripts, na raiz
 
 ## Como executar
 
@@ -27,6 +27,15 @@ Leitor de e-mail local com **Electron + Node.js**. Não há backend remoto: a co
 cd source
 npm install
 npm start        # ou ./start.sh (na raiz do projeto)
+```
+
+### Instalar como app do desktop (Linux)
+
+Para criar um atalho no menu de aplicativos, com ícone:
+
+```bash
+./install-desktop.sh              # instala/atualiza o atalho
+./install-desktop.sh --uninstall  # remove
 ```
 
 ## Configuração OAuth (feita por você, uma única vez)
@@ -61,8 +70,11 @@ A configuração no Google/Azure é feita **uma vez só**. No novo computador, c
 - Login OAuth com Google (Gmail) e Microsoft (Outlook)
 - Caixa de entrada unificada com painel de leitura lateral
 - Lixeira: excluir move para a lixeira (sem diálogo de confirmação); lá é possível restaurar ou excluir de vez
-- Busca por remetente, assunto e conteúdo
+- Busca por remetente, assunto e conteúdo, com filtro por período e ordenação
 - Seleção múltipla, exclusão e restauração em lote
+- **Domínios:** agrupa os remetentes por domínio, mostrando de quais sites/serviços você recebe e-mail (e quantos) — com um clique você filtra a caixa por aquele domínio
+- **Automatizador:** regras de limpeza salvas — cada regra guarda um termo e, ao ser executada, move para a lixeira todos os e-mails da caixa que contêm esse termo (remetente, assunto ou conteúdo)
+- Zoom ajustável do corpo do e-mail
 - Cache local criptografado (abertura instantânea, menos requests)
 - Armazenamento 100% local: tokens e cache criptografados com o `safeStorage` do Electron
 
