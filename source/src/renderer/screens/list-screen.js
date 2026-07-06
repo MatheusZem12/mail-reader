@@ -7,6 +7,9 @@ import {
   restoreEmail,
   emptyTrash,
   getAccounts,
+  getAutomationRules,
+  saveAutomationRule,
+  deleteAutomationRule,
   openExternal,
   getBodyZoom,
   setBodyZoom,
@@ -44,12 +47,15 @@ const ICONS = {
   trash: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
   restore: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>',
   mail: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>',
+  edit: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+  bolt: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
 };
 
 export async function renderListScreen(container) {
   container.innerHTML = `
     <header class="app-header">
       <h1>Mail Reader</h1>
+      <div class="header-center">
       <div class="search-box">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input type="text" id="search-input" placeholder="Buscar por remetente, assunto ou conteúdo...">
@@ -82,6 +88,7 @@ export async function renderListScreen(container) {
           </div>
         </div>
       </div>
+      </div>
       <div class="app-header-actions">
         <span class="sync-info" id="sync-info"></span>
         <div class="zoom-control" title="Zoom do corpo do e-mail">
@@ -102,11 +109,13 @@ export async function renderListScreen(container) {
         <div class="folder-tabs">
           <button class="folder-tab active" data-folder="inbox">Caixa de entrada</button>
           <button class="folder-tab" data-folder="trash">Lixeira</button>
+          <button class="folder-tab" data-folder="automator">Automatizador</button>
           <button class="folder-tab" data-folder="domains">Domínios</button>
         </div>
         <div class="list-toolbar">
           <input type="checkbox" id="select-all" title="Selecionar todos">
           <span class="selection-info" id="selection-info"></span>
+          <button class="btn-action-text" id="new-automation-btn" hidden>+ Nova automação</button>
           <button class="btn-action-text" id="restore-selected" hidden></button>
           <button class="btn-danger-text" id="delete-selected" hidden></button>
           <button class="btn-danger-text" id="empty-trash-btn" hidden>Esvaziar lixeira</button>
@@ -130,6 +139,7 @@ export async function renderListScreen(container) {
   const deleteSelectedBtn = container.querySelector('#delete-selected');
   const restoreSelectedBtn = container.querySelector('#restore-selected');
   const emptyTrashBtn = container.querySelector('#empty-trash-btn');
+  const newAutomationBtn = container.querySelector('#new-automation-btn');
   const filterWrapEl = container.querySelector('#filter-wrap');
   const filterToggleBtn = container.querySelector('#filter-toggle-btn');
   const filterBadge = container.querySelector('#filter-badge');
@@ -188,6 +198,12 @@ export async function renderListScreen(container) {
   let domainsSyncing = false;
   let domainsScanned = 0;
   let selectedDomain = null;
+
+  // --- Aba "Automatizador" (regras de limpeza salvas) ---
+  let automationRules = [];
+  let automationQuery = ''; // filtro local por nome/termo
+  let selectedRuleId = null;
+  let runningRuleId = null; // trava reentrância enquanto uma regra está rodando
 
   clearReadingPane();
 
@@ -483,6 +499,21 @@ export async function renderListScreen(container) {
     openBodyHosts = [];
     selectedDomain = null;
 
+    if (folder === 'automator') {
+      selectedRuleId = null;
+      readingPane.innerHTML = `
+        <div class="empty-state reading-empty">
+          ${ICONS.bolt}
+          <p>Selecione uma automação ou crie uma nova</p>
+          <div class="automation-empty-hint">
+            Uma automação guarda um termo (ex.: "OLX") e, ao ser executada,
+            move para a lixeira todos os e-mails que contêm esse termo.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     if (folder === 'domains') {
       readingPane.innerHTML = `
         <div class="empty-state reading-empty">
@@ -549,7 +580,7 @@ export async function renderListScreen(container) {
   }
 
   function handleKeyboardShortcuts(e) {
-    if (folder === 'domains') return; // atalhos de e-mail não se aplicam à tela de domínios
+    if (folder === 'domains' || folder === 'automator') return; // atalhos de e-mail não se aplicam a essas telas
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -748,8 +779,11 @@ export async function renderListScreen(container) {
   // Domínios: troca pra Caixa de entrada já com a busca preenchida, num só passo.
   function switchFolder(next, { presetQuery = null } = {}) {
     if (next === folder && presetQuery == null) return;
-    const enteringDomains = next === 'domains';
-    const leavingDomains = folder === 'domains';
+    // Domínios e Automatizador têm filtros locais próprios, separados da busca
+    // de e-mails — ao entrar ou sair de qualquer um deles, começamos do zero.
+    const specialFolders = ['domains', 'automator'];
+    const enteringSpecial = specialFolders.includes(next);
+    const leavingSpecial = specialFolders.includes(folder);
     folder = next;
     folderTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.folder === folder));
 
@@ -757,16 +791,17 @@ export async function renderListScreen(container) {
       query = presetQuery;
       searchInput.value = presetQuery;
       searchClear.hidden = presetQuery.length === 0;
-    } else if (enteringDomains || leavingDomains) {
-      // Domínios usa um filtro local à parte da busca de e-mails — ao
-      // entrar/sair, começa do zero pra não misturar os dois contextos.
+    } else if (enteringSpecial || leavingSpecial) {
       query = '';
       domainsQuery = '';
+      automationQuery = '';
       searchInput.value = '';
       searchClear.hidden = true;
     }
 
     selectedIds.clear();
+    // Botões que só fazem sentido fora das telas especiais.
+    newAutomationBtn.hidden = true;
     clearReadingPane();
 
     if (folder === 'domains') {
@@ -778,6 +813,16 @@ export async function renderListScreen(container) {
       filterWrapEl.hidden = true;
       closeFilterPopover();
       startDomainsView();
+    } else if (folder === 'automator') {
+      searchInput.placeholder = 'Filtrar automações...';
+      selectAllEl.hidden = true;
+      restoreSelectedBtn.hidden = true;
+      deleteSelectedBtn.hidden = true;
+      emptyTrashBtn.hidden = true;
+      newAutomationBtn.hidden = false;
+      filterWrapEl.hidden = true;
+      closeFilterPopover();
+      startAutomatorView();
     } else {
       searchInput.placeholder = 'Buscar por remetente, assunto ou conteúdo...';
       selectAllEl.hidden = false;
@@ -932,6 +977,298 @@ export async function renderListScreen(container) {
     }
   }
 
+  // --- Automatizador: regras que movem e-mails em massa para a lixeira ---
+
+  function filteredRules() {
+    if (!automationQuery) return automationRules;
+    const q = automationQuery.toLowerCase();
+    return automationRules.filter(
+      (r) => (r.name || '').toLowerCase().includes(q) || (r.query || '').toLowerCase().includes(q)
+    );
+  }
+
+  function automationRunSummary(rule) {
+    if (!rule.lastRunAt) return 'nunca executada';
+    return `última: ${rule.lastRunCount || 0} e-mail(s) em ${formatDateCompact(rule.lastRunAt)}`;
+  }
+
+  function updateAutomatorToolbar() {
+    const count = automationRules.length;
+    selectionInfo.textContent = `${count} ${count === 1 ? 'automação' : 'automações'}`;
+  }
+
+  async function startAutomatorView() {
+    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Carregando automações...</div>';
+    try {
+      automationRules = await getAutomationRules();
+    } catch (err) {
+      automationRules = [];
+      showSyncErrors([err.message || 'Erro ao carregar automações']);
+    }
+    if (folder !== 'automator') return; // trocou de aba durante o carregamento
+    renderAutomatorList();
+  }
+
+  function renderAutomatorList() {
+    updateAutomatorToolbar();
+    const filtered = filteredRules();
+
+    if (automationRules.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">Nenhuma automação ainda.<br>Clique em "+ Nova automação" para criar uma.</div>';
+      return;
+    }
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">Nada encontrado para "${escapeHtml(automationQuery)}".</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered.map((rule) => `
+      <div class="automation-row ${rule.id === selectedRuleId ? 'open' : ''}" data-id="${escapeHtml(rule.id)}">
+        <div class="automation-row-body">
+          <div class="automation-row-line1">
+            <span class="automation-row-name">${escapeHtml(rule.name)}</span>
+          </div>
+          <div class="automation-row-line2">termo: "${escapeHtml(rule.query)}" · ${automationRunSummary(rule)}</div>
+        </div>
+        <button class="icon-btn row-action" data-id="${escapeHtml(rule.id)}" title="Limpar agora">${ICONS.trash}</button>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.automation-row').forEach((row) => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.row-action')) return;
+        openRule(row.dataset.id);
+      });
+    });
+    listEl.querySelectorAll('.automation-row .row-action').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const rule = automationRules.find((r) => r.id === btn.dataset.id);
+        if (rule) runRule(rule);
+      });
+    });
+  }
+
+  function openRule(id) {
+    const rule = automationRules.find((r) => r.id === id);
+    if (!rule) return;
+    selectedRuleId = id;
+    listEl.querySelectorAll('.automation-row').forEach((row) => {
+      row.classList.toggle('open', row.dataset.id === id);
+    });
+    renderRuleDetail(rule);
+  }
+
+  function renderRuleDetail(rule) {
+    readingPane.innerHTML = `
+      <div class="reading-header">
+        <div class="reading-header-top">
+          <div class="email-meta"><span class="automation-badge">Automação</span></div>
+          <div class="reading-actions">
+            <button class="icon-btn" id="rule-edit" title="Editar automação">${ICONS.edit}</button>
+            <button class="icon-btn" id="rule-delete" title="Excluir automação">${ICONS.trash}</button>
+          </div>
+        </div>
+        <h2>${escapeHtml(rule.name)}</h2>
+      </div>
+      <div class="detail-row"><strong>Termo de busca:</strong> ${escapeHtml(rule.query)}</div>
+      <div class="detail-row">Ao executar, move para a lixeira todos os e-mails da caixa de entrada que contenham este termo no remetente, assunto ou conteúdo.</div>
+      <div class="detail-row">${automationRunSummary(rule)}</div>
+      <button class="btn btn-danger" id="rule-run-btn" style="margin-top: 16px;">Limpar agora</button>
+      <div class="rule-run-status" id="rule-run-status"></div>
+    `;
+
+    readingPane.querySelector('#rule-run-btn').addEventListener('click', () => runRule(rule));
+    readingPane.querySelector('#rule-edit').addEventListener('click', () => showRuleForm(rule));
+    readingPane.querySelector('#rule-delete').addEventListener('click', () => removeRule(rule));
+  }
+
+  function showRuleForm(rule = null) {
+    const isEdit = !!rule;
+    selectedRuleId = rule ? rule.id : null;
+    listEl.querySelectorAll('.automation-row').forEach((row) => {
+      row.classList.toggle('open', isEdit && row.dataset.id === rule.id);
+    });
+
+    readingPane.innerHTML = `
+      <div class="reading-header">
+        <h2>${isEdit ? 'Editar automação' : 'Nova automação'}</h2>
+      </div>
+      <div class="automation-form">
+        <div class="form-group">
+          <label for="rule-name-input">Nome</label>
+          <input type="text" id="rule-name-input" placeholder="Ex.: Limpar OLX" value="${isEdit ? escapeHtml(rule.name) : ''}">
+        </div>
+        <div class="form-group">
+          <label for="rule-query-input">Termo de busca</label>
+          <input type="text" id="rule-query-input" placeholder="Ex.: OLX ou olx.com.br" value="${isEdit ? escapeHtml(rule.query) : ''}">
+        </div>
+        <p class="automation-form-help">
+          Tudo que contiver este termo no remetente, assunto ou conteúdo será movido
+          para a lixeira quando você executar a automação. Prefira um domínio
+          (ex.: olx.com.br) para ser mais preciso.
+        </p>
+        <div class="error-message" id="rule-form-error" hidden></div>
+        <div class="automation-form-actions">
+          <button class="btn btn-primary" id="rule-save-btn">${isEdit ? 'Salvar' : 'Criar automação'}</button>
+          <button class="btn btn-text" id="rule-cancel-btn">Cancelar</button>
+        </div>
+      </div>
+    `;
+
+    const nameInput = readingPane.querySelector('#rule-name-input');
+    const queryInput = readingPane.querySelector('#rule-query-input');
+    const errorEl = readingPane.querySelector('#rule-form-error');
+    nameInput.focus();
+
+    readingPane.querySelector('#rule-save-btn').addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      const q = queryInput.value.trim();
+      if (!name || !q) {
+        errorEl.hidden = false;
+        errorEl.textContent = 'Preencha o nome e o termo de busca.';
+        return;
+      }
+      const id = isEdit ? rule.id : crypto.randomUUID();
+      try {
+        automationRules = await saveAutomationRule({ id, name, query: q });
+      } catch (err) {
+        errorEl.hidden = false;
+        errorEl.textContent = err.message || 'Erro ao salvar automação';
+        return;
+      }
+      if (folder !== 'automator') return;
+      selectedRuleId = id;
+      renderAutomatorList();
+      openRule(id);
+    });
+
+    readingPane.querySelector('#rule-cancel-btn').addEventListener('click', () => {
+      if (isEdit) openRule(rule.id);
+      else clearReadingPane();
+    });
+  }
+
+  async function removeRule(rule) {
+    const confirmed = window.confirm(`Excluir a automação "${rule.name}"? Os e-mails já existentes não são afetados.`);
+    if (!confirmed) return;
+    try {
+      automationRules = await deleteAutomationRule(rule.id);
+    } catch (err) {
+      showSyncErrors([err.message || 'Erro ao excluir automação']);
+      return;
+    }
+    if (folder !== 'automator') return;
+    if (selectedRuleId === rule.id) selectedRuleId = null;
+    clearReadingPane();
+    renderAutomatorList();
+  }
+
+  // Junta todas as páginas de uma busca — a exclusão em massa precisa da lista
+  // inteira, não só da primeira página.
+  async function collectMatchingEmails(searchQuery) {
+    let result = await listEmails({ folder: 'inbox', query: searchQuery, sortOrder: 'desc' });
+    let all = result.emails;
+    let guard = 0; // trava contra loop infinito (se hasMore ficar preso em true)
+    while (result.hasMore && guard < 500) {
+      guard++;
+      const before = all.length;
+      result = await listEmails({ folder: 'inbox', loadMore: true, query: searchQuery, sortOrder: 'desc', currentEmails: all });
+      all = result.emails;
+      if (all.length === before) break;
+    }
+    return all;
+  }
+
+  async function runRule(rule) {
+    if (runningRuleId) return; // já tem uma execução em andamento
+
+    // Garante que o painel de leitura mostra a regra que vai rodar (e tem onde
+    // exibir o progresso).
+    if (selectedRuleId !== rule.id || !readingPane.querySelector('#rule-run-status')) {
+      openRule(rule.id);
+    }
+
+    const confirmed = window.confirm(
+      `Isso vai procurar todos os e-mails que contêm "${rule.query}" e movê-los para a lixeira. Deseja continuar?`
+    );
+    if (!confirmed) return;
+
+    const statusEl = readingPane.querySelector('#rule-run-status');
+    const runBtn = readingPane.querySelector('#rule-run-btn');
+    const setStatus = (html, cls = '') => {
+      if (!statusEl) return;
+      statusEl.className = `rule-run-status ${cls}`.trim();
+      statusEl.innerHTML = html;
+    };
+
+    runningRuleId = rule.id;
+    if (runBtn) runBtn.disabled = true;
+
+    try {
+      setStatus('<div class="spinner-small"></div>Procurando e-mails...');
+      const matches = await collectMatchingEmails(rule.query);
+
+      if (matches.length === 0) {
+        setStatus('Nenhum e-mail encontrado para este termo.', 'success');
+      } else {
+        const ids = matches.map((e) => e.id);
+        let done = 0;
+        // Se a rede cair no meio, não adianta insistir em cada e-mail restante:
+        // assim que der um erro de conexão, os pedidos seguintes já saem curto-
+        // circuitados (evita disparar dezenas de requests condenados).
+        let networkDown = false;
+        setStatus(`<div class="spinner-small"></div>Movendo 0 de ${ids.length} para a lixeira...`);
+        const results = await mapWithConcurrencySettled(ids, DELETE_CONCURRENCY, async (id) => {
+          if (networkDown) throw new Error('offline');
+          try {
+            const r = await deleteEmail(id, { permanent: false, folder: 'inbox', query: rule.query });
+            done++;
+            setStatus(`<div class="spinner-small"></div>Movendo ${done} de ${ids.length} para a lixeira...`);
+            return r;
+          } catch (err) {
+            if (isNetworkError(err)) networkDown = true;
+            throw err;
+          }
+        });
+        const okCount = results.filter((r) => r.status === 'fulfilled').length;
+        const failCount = results.length - okCount;
+
+        if (networkDown) {
+          setStatus(
+            `Sem conexão estável com a internet — ${okCount} movido(s) antes de cair. Verifique a rede e execute de novo.`,
+            'error'
+          );
+        } else {
+          setStatus(
+            failCount > 0
+              ? `✓ ${okCount} e-mail(s) movido(s) para a lixeira. ${failCount} falharam.`
+              : `✓ ${okCount} e-mail(s) movido(s) para a lixeira.`,
+            failCount > 0 ? 'error' : 'success'
+          );
+        }
+
+        // Só registra estatística de execução se de fato moveu algo.
+        if (okCount > 0) {
+          try {
+            automationRules = await saveAutomationRule({ id: rule.id, lastRunAt: Date.now(), lastRunCount: okCount });
+          } catch {}
+        }
+      }
+    } catch (err) {
+      setStatus(
+        isNetworkError(err)
+          ? 'Sem conexão com a internet. Verifique sua rede e tente novamente.'
+          : (err.message || 'Erro ao executar a automação'),
+        'error'
+      );
+    } finally {
+      runningRuleId = null;
+      if (runBtn) runBtn.disabled = false;
+      if (folder === 'automator') renderAutomatorList();
+    }
+  }
+
   // --- Eventos da barra ---
 
   folderTabs.forEach((tab) => {
@@ -946,6 +1283,12 @@ export async function renderListScreen(container) {
       domainsQuery = searchInput.value.trim();
       searchClear.hidden = domainsQuery.length === 0;
       renderDomainsList();
+      return;
+    }
+    if (folder === 'automator') {
+      automationQuery = searchInput.value.trim();
+      searchClear.hidden = automationQuery.length === 0;
+      renderAutomatorList();
       return;
     }
     clearTimeout(searchTimer);
@@ -965,6 +1308,15 @@ export async function renderListScreen(container) {
       domainsQuery = '';
       searchClear.hidden = true;
       renderDomainsList();
+      searchInput.focus();
+      return;
+    }
+    if (folder === 'automator') {
+      if (!automationQuery) return;
+      searchInput.value = '';
+      automationQuery = '';
+      searchClear.hidden = true;
+      renderAutomatorList();
       searchInput.focus();
       return;
     }
@@ -1168,8 +1520,13 @@ export async function renderListScreen(container) {
     }
   });
 
+  newAutomationBtn.addEventListener('click', () => {
+    if (folder === 'automator') showRuleForm();
+  });
+
   refreshBtn.addEventListener('click', () => {
     if (folder === 'domains') loadDomains({ refresh: true });
+    else if (folder === 'automator') startAutomatorView();
     else sync({ refresh: true });
   });
   accountsBtn.addEventListener('click', () => navigate('login'));
@@ -1178,7 +1535,7 @@ export async function renderListScreen(container) {
     const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 150;
     if (!nearBottom) return;
     if (folder === 'domains') loadMoreDomains();
-    else loadMore();
+    else if (folder === 'inbox' || folder === 'trash') loadMore();
   });
 
   // --- Zoom do corpo do e-mail ---
@@ -1305,6 +1662,14 @@ function renderHtmlBody(host, html, { onLinkClick, onKeydown, zoom = 1 } = {}) {
 
 function stripScripts(html) {
   return html.replace(/<script[\s\S]*?<\/script>/gi, '');
+}
+
+// Erros de rede/DNS (getaddrinfo EAI_AGAIN, host não encontrado, conexão
+// recusada/estourada, etc.) — usados para dar uma mensagem clara de "sem
+// conexão" em vez de vazar o erro cru da API.
+function isNetworkError(err) {
+  const msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
+  return /eai_again|enotfound|econnrefused|econnreset|etimedout|epipe|getaddrinfo|network|failed to fetch|socket hang up|offline/.test(msg);
 }
 
 function fromName(from) {

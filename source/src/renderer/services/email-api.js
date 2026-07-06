@@ -66,6 +66,18 @@ export async function emptyTrash() {
   return window.electronAPI.emptyTrash();
 }
 
+export async function getAutomationRules() {
+  return window.electronAPI.getAutomationRules();
+}
+
+export async function saveAutomationRule(rule) {
+  return window.electronAPI.saveAutomationRule(rule);
+}
+
+export async function deleteAutomationRule(id) {
+  return window.electronAPI.deleteAutomationRule(id);
+}
+
 export async function getBodyZoom() {
   return window.electronAPI.getBodyZoom();
 }

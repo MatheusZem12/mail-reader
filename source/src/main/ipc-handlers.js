@@ -7,6 +7,7 @@ const accountStore = require('./storage/account-store');
 const oauthConfig = require('./auth/oauth-config');
 const envStore = require('./storage/env-store');
 const appSettings = require('./storage/app-settings');
+const automationStore = require('./storage/automation-store');
 const emailService = require('./email-service');
 
 // Incrementar quando os TERMOS-DE-USO.md mudarem: força novo aceite.
@@ -155,6 +156,18 @@ function registerIpcHandlers() {
     } catch (err) {
       throw new Error(err.message || 'Erro ao esvaziar a lixeira');
     }
+  });
+
+  ipcMain.handle('get-automation-rules', () => {
+    return automationStore.getRules();
+  });
+
+  ipcMain.handle('save-automation-rule', (_event, rule) => {
+    return automationStore.saveRule(rule || {});
+  });
+
+  ipcMain.handle('delete-automation-rule', (_event, id) => {
+    return automationStore.deleteRule(id);
   });
 }
 
