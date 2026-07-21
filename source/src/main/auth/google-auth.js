@@ -3,6 +3,7 @@ const http = require('http');
 const { shell } = require('electron');
 const { URL } = require('url');
 const oauthConfig = require('./oauth-config');
+const accountStore = require('../storage/account-store');
 
 const SCOPES = ['https://mail.google.com/'];
 const REDIRECT_PORT = 42813;
@@ -45,12 +46,23 @@ function startCallbackServer() {
 
 async function startAuthFlow() {
   const oauth2Client = getClient();
-  const url = oauth2Client.generateAuthUrl({
+
+  // Só força o consentimento completo se ainda não temos um refresh token.
+  // Pedir consentimento toda vez gera um novo refresh token e pode invalidar
+  // o anterior, além de ser desnecessário para reconectar uma conta já autorizada.
+  const existingAccounts = accountStore.getAccounts();
+  const hasExistingGoogleAccount = existingAccounts.some((a) => a.provider === 'google');
+
+  const authUrlOptions = {
     access_type: 'offline',
     scope: SCOPES,
-    prompt: 'consent',
     include_granted_scopes: true,
-  });
+  };
+  if (!hasExistingGoogleAccount) {
+    authUrlOptions.prompt = 'consent';
+  }
+
+  const url = oauth2Client.generateAuthUrl(authUrlOptions);
 
   const codePromise = startCallbackServer();
   shell.openExternal(url);
@@ -64,13 +76,23 @@ async function startAuthFlow() {
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
   const { data: profile } = await gmail.users.getProfile({ userId: 'me' });
 
+  const accountId = `google-${profile.emailAddress}`;
+  const existingAccount = accountStore.getAccountWithToken(accountId);
+
+  // Se não veio refresh token e não temos um salvo, precisamos forçar consentimento.
+  if (!tokens.refresh_token && !existingAccount?.refreshToken) {
+    throw new Error(
+      'O Google não devolveu um token de atualização. Remova a conta e conecte novamente com consentimento completo.'
+    );
+  }
+
   return {
-    id: `google-${profile.emailAddress}`,
+    id: accountId,
     provider: 'google',
     email: profile.emailAddress,
     name: profile.emailAddress,
     accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
+    refreshToken: tokens.refresh_token || existingAccount?.refreshToken,
     expiresAt: tokens.expiry_date,
   };
 }

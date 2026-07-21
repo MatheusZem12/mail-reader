@@ -95,6 +95,7 @@ async function refreshAccessToken(account) {
   return {
     accessToken: result.accessToken,
     expiresAt: result.expiresOn.getTime(),
+    account: result.account,
   };
 }
 
