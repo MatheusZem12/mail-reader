@@ -545,20 +545,37 @@ async function getValidAccount(accountId) {
   const account = accountStore.getAccountWithToken(accountId);
   if (!account) return null;
 
-  if (account.expiresAt && Date.now() >= account.expiresAt - 60000) {
-    try {
-      if (account.provider === 'google') {
-        const { refreshAccessToken } = require('./auth/google-auth');
-        const tokens = await refreshAccessToken(account.refreshToken);
-        accountStore.updateTokens(account.id, tokens.accessToken, tokens.expiresAt);
-        account.accessToken = tokens.accessToken;
-        account.expiresAt = tokens.expiresAt;
+  const needsRefresh = !account.expiresAt || Date.now() >= account.expiresAt - 60000;
+  if (!needsRefresh) return account;
+
+  try {
+    if (account.provider === 'google') {
+      if (!account.refreshToken) {
+        throw new Error('token de atualização ausente, reconecte a conta');
       }
-      // Microsoft usa MSAL cache interno; simplificamos no momento
-    } catch (err) {
-      console.error('Erro ao renovar token:', err);
-      return null;
+      const { refreshAccessToken } = require('./auth/google-auth');
+      const tokens = await refreshAccessToken(account.refreshToken);
+      accountStore.updateTokens(account.id, tokens.accessToken, tokens.expiresAt);
+      account.accessToken = tokens.accessToken;
+      account.expiresAt = tokens.expiresAt;
+    } else if (account.provider === 'microsoft') {
+      if (!account.msalAccount) {
+        throw new Error('sessão do Outlook expirada, reconecte a conta');
+      }
+      const { refreshAccessToken } = require('./auth/microsoft-auth');
+      const tokens = await refreshAccessToken(account.msalAccount);
+      accountStore.updateTokens(account.id, tokens.accessToken, tokens.expiresAt, tokens.account);
+      account.accessToken = tokens.accessToken;
+      account.expiresAt = tokens.expiresAt;
+      account.msalAccount = tokens.account;
     }
+  } catch (err) {
+    console.error('Erro ao renovar token:', err);
+    const message = err.message || '';
+    if (/invalid_grant|revoked|expired/i.test(message)) {
+      throw new Error('autorização revogada ou expirada, reconecte a conta');
+    }
+    throw new Error(`falha ao renovar sessão: ${message}`);
   }
 
   return account;

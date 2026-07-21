@@ -59,6 +59,7 @@ function getAccountWithToken(id) {
     ...account,
     accessToken: decrypt(account.accessToken),
     refreshToken: account.refreshToken ? decrypt(account.refreshToken) : undefined,
+    msalAccount: account.msalAccount ? JSON.parse(decrypt(account.msalAccount)) : undefined,
   };
 }
 
@@ -75,6 +76,9 @@ function addAccount(account) {
     expiresAt: account.expiresAt,
     createdAt: Date.now(),
   };
+  if (account.msalAccount) {
+    newAccount.msalAccount = encrypt(JSON.stringify(account.msalAccount));
+  }
   accounts.push(newAccount);
   writeFile(accounts);
 }
@@ -84,12 +88,15 @@ function removeAccount(id) {
   writeFile(accounts);
 }
 
-function updateTokens(id, accessToken, expiresAt) {
+function updateTokens(id, accessToken, expiresAt, msalAccount) {
   const accounts = readFile();
   const index = accounts.findIndex((a) => a.id === id);
   if (index === -1) return;
   accounts[index].accessToken = encrypt(accessToken);
   accounts[index].expiresAt = expiresAt;
+  if (msalAccount) {
+    accounts[index].msalAccount = encrypt(JSON.stringify(msalAccount));
+  }
   writeFile(accounts);
 }
 

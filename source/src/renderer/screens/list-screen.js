@@ -15,6 +15,7 @@ import {
   setBodyZoom,
   onZoomChange,
 } from '../services/email-api.js';
+import { confirmDialog, automationFormDialog } from '../services/dialogs.js';
 
 const BASE_FONT_SIZE = 14;
 
@@ -49,6 +50,7 @@ const ICONS = {
   mail: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>',
   edit: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
   bolt: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+  boltSmall: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
 };
 
 export async function renderListScreen(container) {
@@ -116,6 +118,7 @@ export async function renderListScreen(container) {
           <input type="checkbox" id="select-all" title="Selecionar todos">
           <span class="selection-info" id="selection-info"></span>
           <button class="btn-action-text" id="new-automation-btn" hidden>+ Nova automação</button>
+          <button class="btn-action-text" id="run-all-automations-btn" hidden>▶ Executar todas</button>
           <button class="btn-action-text" id="restore-selected" hidden></button>
           <button class="btn-danger-text" id="delete-selected" hidden></button>
           <button class="btn-danger-text" id="empty-trash-btn" hidden>Esvaziar lixeira</button>
@@ -140,6 +143,7 @@ export async function renderListScreen(container) {
   const restoreSelectedBtn = container.querySelector('#restore-selected');
   const emptyTrashBtn = container.querySelector('#empty-trash-btn');
   const newAutomationBtn = container.querySelector('#new-automation-btn');
+  const runAllAutomationsBtn = container.querySelector('#run-all-automations-btn');
   const filterWrapEl = container.querySelector('#filter-wrap');
   const filterToggleBtn = container.querySelector('#filter-toggle-btn');
   const filterBadge = container.querySelector('#filter-badge');
@@ -202,8 +206,7 @@ export async function renderListScreen(container) {
   // --- Aba "Automatizador" (regras de limpeza salvas) ---
   let automationRules = [];
   let automationQuery = ''; // filtro local por nome/termo
-  let selectedRuleId = null;
-  let runningRuleId = null; // trava reentrância enquanto uma regra está rodando
+  let running = false; // trava reentrância enquanto alguma execução está em andamento
 
   clearReadingPane();
 
@@ -500,14 +503,15 @@ export async function renderListScreen(container) {
     selectedDomain = null;
 
     if (folder === 'automator') {
-      selectedRuleId = null;
       readingPane.innerHTML = `
         <div class="empty-state reading-empty">
           ${ICONS.bolt}
-          <p>Selecione uma automação ou crie uma nova</p>
+          <p>O progresso das execuções aparece aqui</p>
           <div class="automation-empty-hint">
-            Uma automação guarda um termo (ex.: "OLX") e, ao ser executada,
-            move para a lixeira todos os e-mails que contêm esse termo.
+            Cada automação guarda um ou mais termos separados por ";"
+            (ex.: "santander;btg;itau") e move para a lixeira tudo que casar com
+            eles. Use ⚡ para rodar uma, ou "Executar todas" para rodar todas as
+            ativadas — o interruptor de cada linha decide quem entra.
           </div>
         </div>
       `;
@@ -743,13 +747,18 @@ export async function renderListScreen(container) {
     } catch (err) {
       if (currentRequestSignature() !== requestedSignature) return;
       if (emails.length === 0) {
+        const needsReconnect = /reconecte|autorização revogada|sessão expirada|token de atualização/i.test(err.message || '');
         listEl.innerHTML = `
           <div class="empty-state">
             <p>Erro ao ${query ? 'buscar' : 'carregar'} e-mails:<br>${escapeHtml(err.message || 'Erro desconhecido')}</p>
-            <button class="btn btn-primary" id="retry-btn" style="margin-top: 16px;">Tentar novamente</button>
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+              <button class="btn btn-primary" id="retry-btn">Tentar novamente</button>
+              ${needsReconnect ? `<button class="btn" id="manage-accounts-btn">Gerenciar contas</button>` : ''}
+            </div>
           </div>
         `;
         listEl.querySelector('#retry-btn')?.addEventListener('click', () => sync({ refresh: true }));
+        listEl.querySelector('#manage-accounts-btn')?.addEventListener('click', () => navigate('login'));
       } else {
         showSyncErrors([err.message || 'Erro ao sincronizar']);
       }
@@ -802,6 +811,7 @@ export async function renderListScreen(container) {
     selectedIds.clear();
     // Botões que só fazem sentido fora das telas especiais.
     newAutomationBtn.hidden = true;
+    runAllAutomationsBtn.hidden = true;
     clearReadingPane();
 
     if (folder === 'domains') {
@@ -992,9 +1002,52 @@ export async function renderListScreen(container) {
     return `última: ${rule.lastRunCount || 0} e-mail(s) em ${formatDateCompact(rule.lastRunAt)}`;
   }
 
+  // Regras criadas antes do toggle existir não têm o campo — contam como ativas.
+  function isRuleEnabled(rule) {
+    return rule.enabled !== false;
+  }
+
+  // O termo aceita vários valores separados por ";" — ex.: "santander;btg;itau"
+  // limpa os três de uma vez. Uma regra com um termo só continua funcionando
+  // igual (split de string sem ";" devolve ela mesma).
+  function ruleTerms(rule) {
+    return String(rule.query || '')
+      .split(';')
+      .map((t) => t.trim())
+      .filter(Boolean);
+  }
+
+  function formatTerms(rule) {
+    const terms = ruleTerms(rule);
+    return terms.map((t) => `"${t}"`).join(', ');
+  }
+
+  // Dois nomes iguais deixam impossível saber qual regra é qual na lista —
+  // e "Executar todas" vira uma roleta. Comparação sem acento/caixa/espaço extra.
+  function normalizeName(name) {
+    return String(name || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function findDuplicateName(name, exceptId = null) {
+    const target = normalizeName(name);
+    return automationRules.find((r) => r.id !== exceptId && normalizeName(r.name) === target) || null;
+  }
+
+  function enabledRules() {
+    return automationRules.filter(isRuleEnabled);
+  }
+
   function updateAutomatorToolbar() {
     const count = automationRules.length;
-    selectionInfo.textContent = `${count} ${count === 1 ? 'automação' : 'automações'}`;
+    const active = enabledRules().length;
+    selectionInfo.textContent = count === 0
+      ? '0 automações'
+      : `${count} ${count === 1 ? 'automação' : 'automações'} · ${active} ativa${active === 1 ? '' : 's'}`;
+
+    // Só faz sentido oferecer "executar todas" se houver alguma ativa.
+    runAllAutomationsBtn.hidden = folder !== 'automator' || active === 0;
+    runAllAutomationsBtn.textContent = running ? 'Executando...' : `▶ Executar todas (${active})`;
+    runAllAutomationsBtn.disabled = running;
   }
 
   async function startAutomatorView() {
@@ -1022,135 +1075,117 @@ export async function renderListScreen(container) {
       return;
     }
 
-    listEl.innerHTML = filtered.map((rule) => `
-      <div class="automation-row ${rule.id === selectedRuleId ? 'open' : ''}" data-id="${escapeHtml(rule.id)}">
+    listEl.innerHTML = filtered.map((rule) => {
+      const on = isRuleEnabled(rule);
+      return `
+      <div class="automation-row ${on ? '' : 'off'}" data-id="${escapeHtml(rule.id)}">
+        <label class="switch" title="${on ? 'Desativar automação' : 'Ativar automação'}">
+          <input type="checkbox" class="rule-toggle" data-id="${escapeHtml(rule.id)}" ${on ? 'checked' : ''}>
+          <span class="switch-track"></span>
+        </label>
         <div class="automation-row-body">
           <div class="automation-row-line1">
             <span class="automation-row-name">${escapeHtml(rule.name)}</span>
+            ${on ? '' : '<span class="automation-off-badge">desativada</span>'}
           </div>
-          <div class="automation-row-line2">termo: "${escapeHtml(rule.query)}" · ${automationRunSummary(rule)}</div>
+          <div class="automation-row-line2">${ruleTerms(rule).length > 1 ? 'termos' : 'termo'}: ${escapeHtml(formatTerms(rule))} · ${automationRunSummary(rule)}</div>
         </div>
-        <button class="icon-btn row-action" data-id="${escapeHtml(rule.id)}" title="Limpar agora">${ICONS.trash}</button>
+        <div class="automation-row-actions">
+          <button class="icon-btn action-run" data-id="${escapeHtml(rule.id)}" title="Executar agora">${ICONS.boltSmall}</button>
+          <button class="icon-btn action-edit" data-id="${escapeHtml(rule.id)}" title="Editar automação">${ICONS.edit}</button>
+          <button class="icon-btn action-delete" data-id="${escapeHtml(rule.id)}" title="Excluir automação">${ICONS.trash}</button>
+        </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
+    const ruleOf = (btn) => automationRules.find((r) => r.id === btn.dataset.id);
+    const wire = (selector, handler) => {
+      listEl.querySelectorAll(selector).forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rule = ruleOf(btn);
+          if (rule) handler(rule);
+        });
+      });
+    };
+    wire('.automation-row .action-run', (rule) => runRule(rule));
+    wire('.automation-row .action-edit', (rule) => showRuleForm(rule));
+    wire('.automation-row .action-delete', (rule) => removeRule(rule));
+
+    // Clicar na linha (fora dos botões) abre a edição — o painel da direita é
+    // só de execução agora, não tem mais "detalhe da regra" pra abrir.
     listEl.querySelectorAll('.automation-row').forEach((row) => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.row-action')) return;
-        openRule(row.dataset.id);
+        if (e.target.closest('.icon-btn') || e.target.closest('.switch')) return;
+        const rule = automationRules.find((r) => r.id === row.dataset.id);
+        if (rule) showRuleForm(rule);
       });
     });
-    listEl.querySelectorAll('.automation-row .row-action').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const rule = automationRules.find((r) => r.id === btn.dataset.id);
-        if (rule) runRule(rule);
+
+    listEl.querySelectorAll('.rule-toggle').forEach((toggle) => {
+      toggle.addEventListener('click', (e) => e.stopPropagation());
+      toggle.addEventListener('change', () => {
+        const rule = automationRules.find((r) => r.id === toggle.dataset.id);
+        if (rule) setRuleEnabled(rule, toggle.checked);
       });
     });
   }
 
-  function openRule(id) {
-    const rule = automationRules.find((r) => r.id === id);
-    if (!rule) return;
-    selectedRuleId = id;
-    listEl.querySelectorAll('.automation-row').forEach((row) => {
-      row.classList.toggle('open', row.dataset.id === id);
-    });
-    renderRuleDetail(rule);
+  // Ativar/desativar não mexe em e-mail nenhum — só decide se a regra entra no
+  // "Executar todas". Rodar uma regra desativada na mão continua permitido.
+  async function setRuleEnabled(rule, enabled) {
+    const previous = isRuleEnabled(rule);
+    rule.enabled = enabled; // otimista: a lista já re-renderiza com o novo estado
+    renderAutomatorList();
+    try {
+      automationRules = await saveAutomationRule({ id: rule.id, enabled });
+    } catch (err) {
+      rule.enabled = previous;
+      showSyncErrors([err.message || 'Erro ao salvar a automação']);
+    }
+    if (folder === 'automator') renderAutomatorList();
   }
 
-  function renderRuleDetail(rule) {
-    readingPane.innerHTML = `
-      <div class="reading-header">
-        <div class="reading-header-top">
-          <div class="email-meta"><span class="automation-badge">Automação</span></div>
-          <div class="reading-actions">
-            <button class="icon-btn" id="rule-edit" title="Editar automação">${ICONS.edit}</button>
-            <button class="icon-btn" id="rule-delete" title="Excluir automação">${ICONS.trash}</button>
-          </div>
-        </div>
-        <h2>${escapeHtml(rule.name)}</h2>
-      </div>
-      <div class="detail-row"><strong>Termo de busca:</strong> ${escapeHtml(rule.query)}</div>
-      <div class="detail-row">Ao executar, move para a lixeira todos os e-mails da caixa de entrada que contenham este termo no remetente, assunto ou conteúdo.</div>
-      <div class="detail-row">${automationRunSummary(rule)}</div>
-      <button class="btn btn-danger" id="rule-run-btn" style="margin-top: 16px;">Limpar agora</button>
-      <div class="rule-run-status" id="rule-run-status"></div>
-    `;
-
-    readingPane.querySelector('#rule-run-btn').addEventListener('click', () => runRule(rule));
-    readingPane.querySelector('#rule-edit').addEventListener('click', () => showRuleForm(rule));
-    readingPane.querySelector('#rule-delete').addEventListener('click', () => removeRule(rule));
-  }
-
-  function showRuleForm(rule = null) {
+  // Criação e edição acontecem num modal centralizado — o painel de leitura
+  // fica reservado para consultar/executar a automação.
+  async function showRuleForm(rule = null) {
     const isEdit = !!rule;
-    selectedRuleId = rule ? rule.id : null;
-    listEl.querySelectorAll('.automation-row').forEach((row) => {
-      row.classList.toggle('open', isEdit && row.dataset.id === rule.id);
+    const values = await automationFormDialog({
+      rule,
+      validate: ({ name, query: q }) => {
+        if (!name || !q) return 'Preencha o nome e os termos de busca.';
+        if (ruleTerms({ query: q }).length === 0) return 'Informe pelo menos um termo de busca válido.';
+        const duplicate = findDuplicateName(name, isEdit ? rule.id : null);
+        if (duplicate) return `Já existe uma automação chamada "${duplicate.name}". Escolha outro nome.`;
+        return null;
+      },
     });
+    if (!values) return; // cancelou
 
-    readingPane.innerHTML = `
-      <div class="reading-header">
-        <h2>${isEdit ? 'Editar automação' : 'Nova automação'}</h2>
-      </div>
-      <div class="automation-form">
-        <div class="form-group">
-          <label for="rule-name-input">Nome</label>
-          <input type="text" id="rule-name-input" placeholder="Ex.: Limpar OLX" value="${isEdit ? escapeHtml(rule.name) : ''}">
-        </div>
-        <div class="form-group">
-          <label for="rule-query-input">Termo de busca</label>
-          <input type="text" id="rule-query-input" placeholder="Ex.: OLX ou olx.com.br" value="${isEdit ? escapeHtml(rule.query) : ''}">
-        </div>
-        <p class="automation-form-help">
-          Tudo que contiver este termo no remetente, assunto ou conteúdo será movido
-          para a lixeira quando você executar a automação. Prefira um domínio
-          (ex.: olx.com.br) para ser mais preciso.
-        </p>
-        <div class="error-message" id="rule-form-error" hidden></div>
-        <div class="automation-form-actions">
-          <button class="btn btn-primary" id="rule-save-btn">${isEdit ? 'Salvar' : 'Criar automação'}</button>
-          <button class="btn btn-text" id="rule-cancel-btn">Cancelar</button>
-        </div>
-      </div>
-    `;
-
-    const nameInput = readingPane.querySelector('#rule-name-input');
-    const queryInput = readingPane.querySelector('#rule-query-input');
-    const errorEl = readingPane.querySelector('#rule-form-error');
-    nameInput.focus();
-
-    readingPane.querySelector('#rule-save-btn').addEventListener('click', async () => {
-      const name = nameInput.value.trim();
-      const q = queryInput.value.trim();
-      if (!name || !q) {
-        errorEl.hidden = false;
-        errorEl.textContent = 'Preencha o nome e o termo de busca.';
-        return;
-      }
-      const id = isEdit ? rule.id : crypto.randomUUID();
-      try {
-        automationRules = await saveAutomationRule({ id, name, query: q });
-      } catch (err) {
-        errorEl.hidden = false;
-        errorEl.textContent = err.message || 'Erro ao salvar automação';
-        return;
-      }
-      if (folder !== 'automator') return;
-      selectedRuleId = id;
-      renderAutomatorList();
-      openRule(id);
-    });
-
-    readingPane.querySelector('#rule-cancel-btn').addEventListener('click', () => {
-      if (isEdit) openRule(rule.id);
-      else clearReadingPane();
-    });
+    const id = isEdit ? rule.id : crypto.randomUUID();
+    try {
+      automationRules = await saveAutomationRule({
+        id,
+        name: values.name,
+        query: values.query,
+        enabled: isEdit ? isRuleEnabled(rule) : true,
+      });
+    } catch (err) {
+      showSyncErrors([err.message || 'Erro ao salvar automação']);
+      return;
+    }
+    if (folder !== 'automator') return;
+    renderAutomatorList();
   }
 
   async function removeRule(rule) {
-    const confirmed = window.confirm(`Excluir a automação "${rule.name}"? Os e-mails já existentes não são afetados.`);
+    const confirmed = await confirmDialog({
+      title: `Excluir a automação "${rule.name}"?`,
+      message: 'Os e-mails já existentes não são afetados.',
+      confirmLabel: 'Excluir',
+      danger: true,
+    });
     if (!confirmed) return;
     try {
       automationRules = await deleteAutomationRule(rule.id);
@@ -1159,8 +1194,6 @@ export async function renderListScreen(container) {
       return;
     }
     if (folder !== 'automator') return;
-    if (selectedRuleId === rule.id) selectedRuleId = null;
-    clearReadingPane();
     renderAutomatorList();
   }
 
@@ -1180,93 +1213,196 @@ export async function renderListScreen(container) {
     return all;
   }
 
-  async function runRule(rule) {
-    if (runningRuleId) return; // já tem uma execução em andamento
+  // Busca, um termo de cada vez, tudo que casa com a regra. Sequencial de
+  // propósito (cada busca já pagina várias vezes no servidor) e sem repetir
+  // e-mail: dois termos da mesma regra costumam cair na mesma conversa.
+  async function collectRuleMatches(rule, onSearch) {
+    const terms = ruleTerms(rule);
+    const seen = new Set();
+    const matches = []; // { id, term } — o termo vai junto porque a exclusão o usa pra ajustar o cache
+    for (let i = 0; i < terms.length; i++) {
+      onSearch?.({ term: terms[i], index: i, total: terms.length, found: matches.length });
+      for (const email of await collectMatchingEmails(terms[i])) {
+        if (seen.has(email.id)) continue;
+        seen.add(email.id);
+        matches.push({ id: email.id, term: terms[i] });
+      }
+    }
+    return matches;
+  }
 
-    // Garante que o painel de leitura mostra a regra que vai rodar (e tem onde
-    // exibir o progresso).
-    if (selectedRuleId !== rule.id || !readingPane.querySelector('#rule-run-status')) {
-      openRule(rule.id);
+  // Núcleo da execução de uma regra, sem nada de interface: busca tudo que casa
+  // com os termos, move para a lixeira e devolve o resumo. Quem chama decide
+  // como mostrar (execução avulsa no painel da regra ou "executar todas").
+  async function executeRule(rule, { onSearch, onProgress } = {}) {
+    const matches = await collectRuleMatches(rule, onSearch);
+    if (matches.length === 0) return { total: 0, okCount: 0, failCount: 0, networkDown: false };
+
+    let done = 0;
+    // Se a rede cair no meio, não adianta insistir em cada e-mail restante:
+    // assim que der um erro de conexão, os pedidos seguintes já saem curto-
+    // circuitados (evita disparar dezenas de requests condenados).
+    let networkDown = false;
+    onProgress?.({ done: 0, total: matches.length });
+    const results = await mapWithConcurrencySettled(matches, DELETE_CONCURRENCY, async ({ id, term }) => {
+      if (networkDown) throw new Error('offline');
+      try {
+        const r = await deleteEmail(id, { permanent: false, folder: 'inbox', query: term });
+        done++;
+        onProgress?.({ done, total: matches.length });
+        return r;
+      } catch (err) {
+        if (isNetworkError(err)) networkDown = true;
+        throw err;
+      }
+    });
+    const okCount = results.filter((r) => r.status === 'fulfilled').length;
+
+    // Só registra estatística de execução se de fato moveu algo.
+    if (okCount > 0) {
+      try {
+        automationRules = await saveAutomationRule({ id: rule.id, lastRunAt: Date.now(), lastRunCount: okCount });
+      } catch {}
     }
 
-    const confirmed = window.confirm(
-      `Isso vai procurar todos os e-mails que contêm "${rule.query}" e movê-los para a lixeira. Deseja continuar?`
-    );
+    return { total: matches.length, okCount, failCount: results.length - okCount, networkDown };
+  }
+
+  // Texto curto do resultado de uma regra — mesma frase na execução avulsa e
+  // na execução em massa, já que agora as duas usam o mesmo painel.
+  function runResultMessage({ total, okCount, failCount, networkDown }) {
+    if (total === 0) return { text: 'nada encontrado', cls: '' };
+    if (networkDown) return { text: `sem conexão — ${okCount} movido(s) antes de cair`, cls: 'error' };
+    if (failCount > 0) return { text: `${okCount} movido(s), ${failCount} com erro`, cls: 'error' };
+    return { text: `${okCount} e-mail(s) para a lixeira`, cls: 'success' };
+  }
+
+  // Painel de execução (lado direito). Uma linha por regra — vale tanto pro
+  // "Executar todas" quanto pra execução de uma só.
+  function renderRunPanel(rules, title) {
+    readingPane.innerHTML = `
+      <div class="reading-header">
+        <div class="reading-header-top">
+          <div class="email-meta"><span class="automation-badge">Executando</span></div>
+        </div>
+        <h2>${escapeHtml(title)}</h2>
+      </div>
+      <div class="run-all-list">
+        ${rules.map((rule) => `
+          <div class="run-all-item" data-id="${escapeHtml(rule.id)}">
+            <span class="run-all-item-name">${escapeHtml(rule.name)}</span>
+            <span class="run-all-item-status">na fila</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="rule-run-status" id="run-all-summary"></div>
+    `;
+  }
+
+  // Executa uma lista de regras, uma de cada vez. Sequencial de propósito:
+  // cada regra já dispara DELETE_CONCURRENCY exclusões em paralelo, e rodar
+  // várias juntas estoura o limite de requests simultâneos da API.
+  async function runRules(rules, { confirmTitle, confirmMessage, panelTitle }) {
+    if (running) return;
+    if (rules.length === 0) return;
+
+    const confirmed = await confirmDialog({
+      title: confirmTitle,
+      message: confirmMessage,
+      confirmLabel: 'Executar',
+      danger: true,
+    });
     if (!confirmed) return;
 
-    const statusEl = readingPane.querySelector('#rule-run-status');
-    const runBtn = readingPane.querySelector('#rule-run-btn');
-    const setStatus = (html, cls = '') => {
-      if (!statusEl) return;
-      statusEl.className = `rule-run-status ${cls}`.trim();
-      statusEl.innerHTML = html;
+    running = true;
+    renderRunPanel(rules, panelTitle);
+    renderAutomatorList();
+
+    const setItemStatus = (id, html, cls = '') => {
+      const el = readingPane.querySelector(`.run-all-item[data-id="${CSS.escape(id)}"] .run-all-item-status`);
+      if (!el) return; // painel foi substituído — só ignora
+      el.className = `run-all-item-status ${cls}`.trim();
+      el.innerHTML = html;
+    };
+    const setSummary = (html, cls = '') => {
+      const el = readingPane.querySelector('#run-all-summary');
+      if (!el) return;
+      el.className = `rule-run-status ${cls}`.trim();
+      el.innerHTML = html;
     };
 
-    runningRuleId = rule.id;
-    if (runBtn) runBtn.disabled = true;
-
+    let totalMoved = 0;
+    let failedRules = 0;
     try {
-      setStatus('<div class="spinner-small"></div>Procurando e-mails...');
-      const matches = await collectMatchingEmails(rule.query);
-
-      if (matches.length === 0) {
-        setStatus('Nenhum e-mail encontrado para este termo.', 'success');
-      } else {
-        const ids = matches.map((e) => e.id);
-        let done = 0;
-        // Se a rede cair no meio, não adianta insistir em cada e-mail restante:
-        // assim que der um erro de conexão, os pedidos seguintes já saem curto-
-        // circuitados (evita disparar dezenas de requests condenados).
-        let networkDown = false;
-        setStatus(`<div class="spinner-small"></div>Movendo 0 de ${ids.length} para a lixeira...`);
-        const results = await mapWithConcurrencySettled(ids, DELETE_CONCURRENCY, async (id) => {
-          if (networkDown) throw new Error('offline');
-          try {
-            const r = await deleteEmail(id, { permanent: false, folder: 'inbox', query: rule.query });
-            done++;
-            setStatus(`<div class="spinner-small"></div>Movendo ${done} de ${ids.length} para a lixeira...`);
-            return r;
-          } catch (err) {
-            if (isNetworkError(err)) networkDown = true;
-            throw err;
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        setSummary(rules.length > 1
+          ? `<div class="spinner-small"></div>Executando ${i + 1} de ${rules.length}: ${escapeHtml(rule.name)}...`
+          : `<div class="spinner-small"></div>Executando "${escapeHtml(rule.name)}"...`);
+        readingPane.querySelector(`.run-all-item[data-id="${CSS.escape(rule.id)}"]`)?.classList.add('running');
+        setItemStatus(rule.id, 'procurando...');
+        try {
+          const result = await executeRule(rule, {
+            onSearch: ({ term, index, total }) => {
+              setItemStatus(rule.id, total > 1 ? `procurando "${escapeHtml(term)}" (${index + 1}/${total})...` : 'procurando...');
+            },
+            onProgress: ({ done, total }) => {
+              setItemStatus(rule.id, `movendo ${done} de ${total}...`);
+            },
+          });
+          totalMoved += result.okCount;
+          if (result.failCount > 0 || result.networkDown) failedRules++;
+          const { text, cls } = runResultMessage(result);
+          setItemStatus(rule.id, escapeHtml(text), cls);
+          // Rede caiu: as próximas regras só somariam erro em cima de erro.
+          if (result.networkDown) {
+            setSummary('Sem conexão estável com a internet — execução interrompida. Verifique a rede e tente de novo.', 'error');
+            return;
           }
-        });
-        const okCount = results.filter((r) => r.status === 'fulfilled').length;
-        const failCount = results.length - okCount;
-
-        if (networkDown) {
-          setStatus(
-            `Sem conexão estável com a internet — ${okCount} movido(s) antes de cair. Verifique a rede e execute de novo.`,
-            'error'
-          );
-        } else {
-          setStatus(
-            failCount > 0
-              ? `✓ ${okCount} e-mail(s) movido(s) para a lixeira. ${failCount} falharam.`
-              : `✓ ${okCount} e-mail(s) movido(s) para a lixeira.`,
-            failCount > 0 ? 'error' : 'success'
-          );
-        }
-
-        // Só registra estatística de execução se de fato moveu algo.
-        if (okCount > 0) {
-          try {
-            automationRules = await saveAutomationRule({ id: rule.id, lastRunAt: Date.now(), lastRunCount: okCount });
-          } catch {}
+        } catch (err) {
+          failedRules++;
+          setItemStatus(rule.id, escapeHtml(err.message || 'erro'), 'error');
+          if (isNetworkError(err)) {
+            setSummary('Sem conexão com a internet — execução interrompida. Verifique sua rede e tente de novo.', 'error');
+            return;
+          }
+        } finally {
+          readingPane.querySelector(`.run-all-item[data-id="${CSS.escape(rule.id)}"]`)?.classList.remove('running');
         }
       }
-    } catch (err) {
-      setStatus(
-        isNetworkError(err)
-          ? 'Sem conexão com a internet. Verifique sua rede e tente novamente.'
-          : (err.message || 'Erro ao executar a automação'),
-        'error'
+
+      setSummary(
+        failedRules > 0
+          ? `✓ ${totalMoved} e-mail(s) movido(s) para a lixeira. ${failedRules} automação(ões) com erro.`
+          : `✓ Concluído — ${totalMoved} e-mail(s) movido(s) para a lixeira.`,
+        failedRules > 0 ? 'error' : 'success'
       );
     } finally {
-      runningRuleId = null;
-      if (runBtn) runBtn.disabled = false;
+      running = false;
       if (folder === 'automator') renderAutomatorList();
     }
+  }
+
+  function runRule(rule) {
+    const terms = ruleTerms(rule);
+    return runRules([rule], {
+      confirmTitle: `Executar "${rule.name}"?`,
+      confirmMessage: terms.length > 1
+        ? `Isso vai procurar todos os e-mails que contêm qualquer um destes ${terms.length} termos — ${formatTerms(rule)} — e movê-los para a lixeira.`
+        : `Isso vai procurar todos os e-mails que contêm "${terms[0] || rule.query}" e movê-los para a lixeira.`,
+      panelTitle: rule.name,
+    });
+  }
+
+  function runAllRules() {
+    const rules = enabledRules();
+    if (rules.length === 0) return;
+    const plural = rules.length === 1 ? '' : 's';
+    return runRules(rules, {
+      confirmTitle: `Executar ${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}?`,
+      confirmMessage: 'As automações desativadas ficam de fora. Todos os e-mails que casarem com os termos serão movidos para a lixeira.',
+      panelTitle: `${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}`,
+    });
   }
 
   // --- Eventos da barra ---
@@ -1497,7 +1633,12 @@ export async function renderListScreen(container) {
 
   emptyTrashBtn.addEventListener('click', async () => {
     if (emails.length === 0 || mutatingInFlight) return;
-    const confirmed = window.confirm('Excluir definitivamente todos os e-mails da lixeira? Essa ação não pode ser desfeita.');
+    const confirmed = await confirmDialog({
+      title: 'Esvaziar a lixeira?',
+      message: 'Todos os e-mails da lixeira serão excluídos definitivamente. Essa ação não pode ser desfeita.',
+      confirmLabel: 'Esvaziar',
+      danger: true,
+    });
     if (!confirmed) return;
 
     mutatingInFlight = true;
@@ -1524,9 +1665,13 @@ export async function renderListScreen(container) {
     if (folder === 'automator') showRuleForm();
   });
 
+  runAllAutomationsBtn.addEventListener('click', () => {
+    if (folder === 'automator') runAllRules();
+  });
+
   refreshBtn.addEventListener('click', () => {
     if (folder === 'domains') loadDomains({ refresh: true });
-    else if (folder === 'automator') startAutomatorView();
+    else if (folder === 'automator') { if (!running) startAutomatorView(); }
     else sync({ refresh: true });
   });
   accountsBtn.addEventListener('click', () => navigate('login'));
@@ -1620,9 +1765,11 @@ function renderHtmlBody(host, html, { onLinkClick, onKeydown, zoom = 1 } = {}) {
   iframe.setAttribute('sandbox', 'allow-same-origin');
   host.replaceWith(iframe);
 
+  // O app é escuro, mas os e-mails HTML são desenhados para fundo claro — o
+  // iframe vira uma "folha de papel" branca (mesma abordagem do Gmail escuro).
   const doc = `<!doctype html><html><head><meta charset="utf-8"><style>
-    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #212121; }
-    body { padding: 2px; word-wrap: break-word; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #212121; background: #ffffff; }
+    body { padding: 14px 16px; word-wrap: break-word; }
     img { max-width: 100%; height: auto; }
     table { max-width: 100%; }
     a { color: #1976d2; }
