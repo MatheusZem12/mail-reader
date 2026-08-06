@@ -629,11 +629,21 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
+/* Corpo do app: nav de pastas (vertical, na borda esquerda) + split view.
+   A nav fica FORA do .split-view de propósito — assim a largura arrastável da
+   lista continua sendo uma porcentagem só do espaço lista+leitura. */
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
 /* Split view: lista à esquerda, leitura à direita */
 .split-view {
   flex: 1;
   display: flex;
   min-height: 0;
+  min-width: 0;
 }
 
 .list-pane {
@@ -658,32 +668,27 @@ body {
   background: rgba(99, 102, 241, 0.5);
 }
 
-/* Nav de pastas/abas. Quando surgem muitas abas (ex.: várias automações no
-   futuro) elas não quebram linha: viram uma faixa rolável na horizontal. */
-.folder-tabs {
+/* Nav de pastas — coluna fixa na esquerda, ao lado da lista de e-mails.
+   Em janelas estreitas ela encolhe para uma faixa só de ícones (o title de
+   cada botão continua dizendo o nome da pasta). */
+.folder-nav {
+  flex: 0 0 176px;
   display: flex;
+  flex-direction: column;
   gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  padding: 10px 8px;
+  background: rgba(10, 12, 17, 0.6);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.folder-tabs::-webkit-scrollbar {
-  height: 5px;
-}
-
-.folder-tabs::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-.folder-tab {
+.folder-nav-item {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   background: none;
   border: none;
   cursor: pointer;
@@ -691,39 +696,68 @@ body {
   font-family: inherit;
   font-weight: 600;
   color: var(--text-secondary);
-  padding: 6px 12px 9px;
-  flex-shrink: 0;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
   white-space: nowrap;
-  border-radius: 8px 8px 0 0;
   transition: color 0.15s, background 0.15s;
 }
 
-.folder-tab::after {
+.folder-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.folder-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-nav-item::before {
   content: '';
   position: absolute;
-  left: 9px;
-  right: 9px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(90deg, var(--primary-hover), var(--primary-2));
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--primary-hover), var(--primary-2));
   opacity: 0;
-  transform: scaleX(0.4);
+  transform: scaleY(0.4);
   transition: opacity 0.18s, transform 0.22s ease-out;
 }
 
-.folder-tab:hover {
+.folder-nav-item:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.folder-tab.active {
+.folder-nav-item.active {
   color: var(--text);
+  background: var(--primary-soft);
 }
 
-.folder-tab.active::after {
+.folder-nav-item.active::before {
   opacity: 1;
-  transform: scaleX(1);
+  transform: scaleY(1);
+}
+
+@media (max-width: 900px) {
+  .folder-nav {
+    flex-basis: 52px;
+    align-items: center;
+  }
+
+  .folder-nav-item {
+    justify-content: center;
+    padding: 9px 0;
+  }
+
+  .folder-nav-label {
+    display: none;
+  }
 }
 
 /* Botão de filtro (funil) no header, ao lado da busca, com popover de
@@ -1051,15 +1085,25 @@ body {
   color: var(--text);
 }
 
-/* Ação rápida da linha (lixeira/restaurar) — aparece no hover */
-.email-row .row-action {
-  padding: 4px;
-  visibility: hidden;
+/* Ações rápidas da linha (lixeira/restaurar/não é spam) — aparecem no hover */
+.email-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
+  visibility: hidden;
 }
 
-.email-row:hover .row-action {
+.email-row-actions .icon-btn {
+  padding: 4px;
+}
+
+.email-row:hover .email-row-actions {
   visibility: visible;
+}
+
+.email-row .row-restore:hover {
+  color: var(--success);
 }
 
 .reading-actions {

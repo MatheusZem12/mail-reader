@@ -9,7 +9,7 @@ Leitor de e-mail local com **Electron + Node.js**. Não há backend remoto: a co
 1. **Primeiro acesso:** o app mostra os Termos de Uso (aceitar para continuar) e depois a tela **"Configurar OAuth"**, com tutorial passo a passo.
 2. **Você cria suas próprias credenciais** OAuth no Google/Microsoft (uma única vez, gratuito), cola os códigos nos campos e o app salva tudo **no `.env` local da sua máquina** — nada vem embutido, nada é enviado para fora.
 3. Daí em diante é só clicar em **"Entrar com Google"** ou **"Entrar com Outlook"**: o navegador abre na tela oficial do provedor, você autoriza, e pronto.
-4. A caixa de entrada unificada mostra os e-mails de todas as contas, com painel de leitura lateral, busca e seleção múltipla, além de abas para **Lixeira**, **Domínios** (de quais sites/serviços você recebe e-mail) e **Automatizador** (regras de limpeza em massa).
+4. A caixa de entrada unificada mostra os e-mails de todas as contas, com painel de leitura lateral, busca e seleção múltipla, além de uma nav lateral com **Spam**, **Lixeira**, **Automatizador** (regras de limpeza em massa) e **Domínios** (de quais sites/serviços você recebe e-mail).
 
 ## Requisitos
 
@@ -69,7 +69,9 @@ A configuração no Google/Azure é feita **uma vez só**. No novo computador, c
 
 - Login OAuth com Google (Gmail) e Microsoft (Outlook)
 - Caixa de entrada unificada com painel de leitura lateral
+- Navegação de pastas em coluna vertical à esquerda da lista (Entrada, Spam, Lixeira, Automatizador, Domínios)
 - Lixeira: excluir move para a lixeira (sem diálogo de confirmação); lá é possível restaurar ou excluir de vez
+- **Spam:** lista o que Gmail/Outlook marcaram como spam, com busca e filtros iguais aos da caixa de entrada; dá para marcar "não é spam" (volta para a entrada) ou mandar para a lixeira
 - Busca por remetente, assunto e conteúdo, com filtro por período e ordenação
 - Seleção múltipla, exclusão e restauração em lote
 - **Domínios:** agrupa os remetentes por domínio, mostrando de quais sites/serviços você recebe e-mail (e quantos) — com um clique você filtra a caixa por aquele domínio

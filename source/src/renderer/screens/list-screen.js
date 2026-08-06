@@ -51,7 +51,46 @@ const ICONS = {
   edit: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
   bolt: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
   boltSmall: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+  notSpam: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8z"></path><polyline points="9 11 11 13 15 9"></polyline></svg>',
 };
+
+// Nav lateral: pastas de e-mail primeiro, telas próprias (que não listam
+// e-mails) depois. A ordem aqui é a ordem que aparece na tela.
+const NAV_ITEMS = [
+  {
+    folder: 'inbox',
+    label: 'Entrada',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
+  },
+  {
+    folder: 'spam',
+    label: 'Spam',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+  },
+  {
+    folder: 'trash',
+    label: 'Lixeira',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+  },
+  {
+    folder: 'automator',
+    label: 'Automatizador',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+  },
+  {
+    folder: 'domains',
+    label: 'Domínios',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+  },
+];
+
+// Pastas que listam e-mails de verdade (paginação, seleção, atalhos de teclado).
+// "domains" e "automator" são telas próprias e ficam de fora.
+const EMAIL_FOLDERS = ['inbox', 'spam', 'trash'];
+
+function isEmailFolder(folder) {
+  return EMAIL_FOLDERS.includes(folder);
+}
 
 export async function renderListScreen(container) {
   container.innerHTML = `
@@ -106,30 +145,34 @@ export async function renderListScreen(container) {
         </button>
       </div>
     </header>
-    <div class="split-view">
-      <div class="list-pane" id="list-pane">
-        <div class="folder-tabs">
-          <button class="folder-tab active" data-folder="inbox">Caixa de entrada</button>
-          <button class="folder-tab" data-folder="trash">Lixeira</button>
-          <button class="folder-tab" data-folder="automator">Automatizador</button>
-          <button class="folder-tab" data-folder="domains">Domínios</button>
+    <div class="app-body">
+      <nav class="folder-nav" id="folder-nav">
+        ${NAV_ITEMS.map((item) => `
+          <button class="folder-nav-item ${item.folder === 'inbox' ? 'active' : ''}" data-folder="${item.folder}" title="${item.label}">
+            <span class="folder-nav-icon">${item.icon}</span>
+            <span class="folder-nav-label">${item.label}</span>
+          </button>
+        `).join('')}
+      </nav>
+      <div class="split-view">
+        <div class="list-pane" id="list-pane">
+          <div class="list-toolbar">
+            <input type="checkbox" id="select-all" title="Selecionar todos">
+            <span class="selection-info" id="selection-info"></span>
+            <button class="btn-action-text" id="new-automation-btn" hidden>+ Nova automação</button>
+            <button class="btn-action-text" id="run-all-automations-btn" hidden>▶ Executar todas</button>
+            <button class="btn-action-text" id="restore-selected" hidden></button>
+            <button class="btn-danger-text" id="delete-selected" hidden></button>
+            <button class="btn-danger-text" id="empty-trash-btn" hidden>Esvaziar lixeira</button>
+          </div>
+          <div class="sync-errors" id="sync-errors" hidden></div>
+          <div id="email-list" class="email-list">
+            <div class="loading-state"><div class="spinner"></div>Carregando e-mails...</div>
+          </div>
         </div>
-        <div class="list-toolbar">
-          <input type="checkbox" id="select-all" title="Selecionar todos">
-          <span class="selection-info" id="selection-info"></span>
-          <button class="btn-action-text" id="new-automation-btn" hidden>+ Nova automação</button>
-          <button class="btn-action-text" id="run-all-automations-btn" hidden>▶ Executar todas</button>
-          <button class="btn-action-text" id="restore-selected" hidden></button>
-          <button class="btn-danger-text" id="delete-selected" hidden></button>
-          <button class="btn-danger-text" id="empty-trash-btn" hidden>Esvaziar lixeira</button>
-        </div>
-        <div class="sync-errors" id="sync-errors" hidden></div>
-        <div id="email-list" class="email-list">
-          <div class="loading-state"><div class="spinner"></div>Carregando e-mails...</div>
-        </div>
+        <div class="split-divider" id="split-divider"></div>
+        <div class="reading-pane" id="reading-pane"></div>
       </div>
-      <div class="split-divider" id="split-divider"></div>
-      <div class="reading-pane" id="reading-pane"></div>
     </div>
   `;
 
@@ -158,7 +201,7 @@ export async function renderListScreen(container) {
   const syncInfoEl = container.querySelector('#sync-info');
   const refreshBtn = container.querySelector('#refresh-btn');
   const accountsBtn = container.querySelector('#accounts-btn');
-  const folderTabs = container.querySelectorAll('.folder-tab');
+  const folderNavItems = container.querySelectorAll('.folder-nav-item');
   const zoomOutBtn = container.querySelector('#zoom-out-btn');
   const zoomInBtn = container.querySelector('#zoom-in-btn');
   const zoomLabel = container.querySelector('#zoom-label');
@@ -236,9 +279,13 @@ export async function renderListScreen(container) {
     const filtered = filteredEmails();
 
     if (emails.length === 0) {
+      const emptyByFolder = {
+        trash: 'A lixeira está vazia.',
+        spam: 'Nenhum e-mail marcado como spam.',
+      };
       const emptyMsg = query
         ? `Nada encontrado para "${escapeHtml(query)}".`
-        : (folder === 'trash' ? 'A lixeira está vazia.' : 'Nenhum e-mail encontrado.');
+        : (emptyByFolder[folder] || 'Nenhum e-mail encontrado.');
       listEl.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
       updateToolbar();
       return;
@@ -246,6 +293,9 @@ export async function renderListScreen(container) {
 
     const rowActionIcon = folder === 'trash' ? ICONS.restore : ICONS.trash;
     const rowActionTitle = folder === 'trash' ? 'Restaurar para a caixa de entrada' : 'Mover para a lixeira';
+    // No spam a linha tem duas ações: tirar do spam ("não é spam") ou mandar
+    // direto pra lixeira.
+    const showRowRestore = folder === 'spam';
 
     const rows = filtered.map((email) => `
       <div class="email-row ${email.isRead ? '' : 'unread'} ${email.id === openId ? 'open' : ''} ${email.id === focusId ? 'focused' : ''}" data-id="${escapeHtml(email.id)}">
@@ -260,7 +310,10 @@ export async function renderListScreen(container) {
             <span class="email-row-subject">${escapeHtml(email.subject)}</span>${email.snippet ? `<span class="email-row-snippet"> — ${escapeHtml(email.snippet)}</span>` : ''}
           </div>
         </div>
-        <button class="icon-btn row-action" data-id="${escapeHtml(email.id)}" title="${rowActionTitle}">${rowActionIcon}</button>
+        <div class="email-row-actions">
+          ${showRowRestore ? `<button class="icon-btn row-restore" data-id="${escapeHtml(email.id)}" title="Não é spam — mover para a caixa de entrada">${ICONS.notSpam}</button>` : ''}
+          <button class="icon-btn row-action" data-id="${escapeHtml(email.id)}" title="${rowActionTitle}">${rowActionIcon}</button>
+        </div>
       </div>
     `).join('');
 
@@ -277,7 +330,7 @@ export async function renderListScreen(container) {
 
     listEl.querySelectorAll('.email-row').forEach((row) => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.row-check') || e.target.closest('.row-action')) return;
+        if (e.target.closest('.row-check') || e.target.closest('.email-row-actions')) return;
         openEmail(row.dataset.id);
       });
     });
@@ -287,6 +340,13 @@ export async function renderListScreen(container) {
         e.stopPropagation();
         if (folder === 'trash') restoreEmails([btn.dataset.id]);
         else removeEmails([btn.dataset.id], { permanent: false });
+      });
+    });
+
+    listEl.querySelectorAll('.row-restore').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        restoreEmails([btn.dataset.id]);
       });
     });
 
@@ -330,8 +390,8 @@ export async function renderListScreen(container) {
       selectionInfo.textContent = `${emails.length} ${unit}${emails.length !== 1 ? 's' : ''}`;
     }
 
-    restoreSelectedBtn.hidden = count === 0 || folder !== 'trash';
-    restoreSelectedBtn.textContent = `Restaurar (${count})`;
+    restoreSelectedBtn.hidden = count === 0 || (folder !== 'trash' && folder !== 'spam');
+    restoreSelectedBtn.textContent = folder === 'spam' ? `Não é spam (${count})` : `Restaurar (${count})`;
     deleteSelectedBtn.hidden = count === 0;
     deleteSelectedBtn.textContent = folder === 'trash' ? `Excluir de vez (${count})` : `Excluir (${count})`;
     // Independe de seleção — esvazia a lixeira toda, não só o que está marcado.
@@ -398,10 +458,15 @@ export async function renderListScreen(container) {
       const email = await getEmail(emailId);
       if (openId !== emailId) return; // usuário já clicou em outro
 
-      const actions = folder === 'trash'
-        ? `<button class="icon-btn" id="reading-restore" title="Restaurar para a caixa de entrada">${ICONS.restore}</button>
-           <button class="icon-btn" id="reading-delete" title="Excluir definitivamente">${ICONS.trash}</button>`
+      const deleteButton = folder === 'trash'
+        ? `<button class="icon-btn" id="reading-delete" title="Excluir definitivamente">${ICONS.trash}</button>`
         : `<button class="icon-btn" id="reading-delete" title="Mover para a lixeira">${ICONS.trash}</button>`;
+      const restoreButton = folder === 'trash'
+        ? `<button class="icon-btn" id="reading-restore" title="Restaurar para a caixa de entrada">${ICONS.restore}</button>`
+        : folder === 'spam'
+          ? `<button class="icon-btn" id="reading-restore" title="Não é spam — mover para a caixa de entrada">${ICONS.notSpam}</button>`
+          : '';
+      const actions = restoreButton + deleteButton;
 
       const messages = email.messages || [];
       const lastIndex = messages.length - 1;
@@ -682,7 +747,7 @@ export async function renderListScreen(container) {
     if (mutatingInFlight) return;
     mutatingInFlight = true;
     try {
-      const results = await mapWithConcurrencySettled(ids, DELETE_CONCURRENCY, (id) => restoreEmail(id, { query, dateFrom, dateTo, sortOrder }));
+      const results = await mapWithConcurrencySettled(ids, DELETE_CONCURRENCY, (id) => restoreEmail(id, { folder, query, dateFrom, dateTo, sortOrder }));
       const done = ids.filter((_, i) => results[i].status === 'fulfilled');
       afterMutation(done, results.filter((r) => r.status === 'rejected'));
     } finally {
@@ -790,11 +855,10 @@ export async function renderListScreen(container) {
     if (next === folder && presetQuery == null) return;
     // Domínios e Automatizador têm filtros locais próprios, separados da busca
     // de e-mails — ao entrar ou sair de qualquer um deles, começamos do zero.
-    const specialFolders = ['domains', 'automator'];
-    const enteringSpecial = specialFolders.includes(next);
-    const leavingSpecial = specialFolders.includes(folder);
+    const enteringSpecial = !isEmailFolder(next);
+    const leavingSpecial = !isEmailFolder(folder);
     folder = next;
-    folderTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.folder === folder));
+    folderNavItems.forEach((item) => item.classList.toggle('active', item.dataset.folder === folder));
 
     if (presetQuery != null) {
       query = presetQuery;
@@ -834,7 +898,12 @@ export async function renderListScreen(container) {
       closeFilterPopover();
       startAutomatorView();
     } else {
-      searchInput.placeholder = 'Buscar por remetente, assunto ou conteúdo...';
+      // A busca é sempre dentro da pasta aberta — o placeholder deixa isso claro.
+      const placeholderByFolder = {
+        trash: 'Buscar na lixeira...',
+        spam: 'Buscar no spam...',
+      };
+      searchInput.placeholder = placeholderByFolder[folder] || 'Buscar por remetente, assunto ou conteúdo...';
       selectAllEl.hidden = false;
       filterWrapEl.hidden = false;
       restartListing();
@@ -1407,8 +1476,8 @@ export async function renderListScreen(container) {
 
   // --- Eventos da barra ---
 
-  folderTabs.forEach((tab) => {
-    tab.addEventListener('click', () => switchFolder(tab.dataset.folder));
+  folderNavItems.forEach((item) => {
+    item.addEventListener('click', () => switchFolder(item.dataset.folder));
   });
 
   // A busca de e-mails vai ao servidor (Gmail/Graph); a de domínios é local
@@ -1680,7 +1749,7 @@ export async function renderListScreen(container) {
     const nearBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 150;
     if (!nearBottom) return;
     if (folder === 'domains') loadMoreDomains();
-    else if (folder === 'inbox' || folder === 'trash') loadMore();
+    else if (isEmailFolder(folder)) loadMore();
   });
 
   // --- Zoom do corpo do e-mail ---
