@@ -5,6 +5,20 @@ const emailCache = require('./storage/email-cache');
 
 const PAGE_SIZE = 50;
 
+// Pastas de e-mail (as que listam mensagens de verdade) e como cada provedor
+// as chama. "Domínios" e "Automatizador" não entram aqui: são telas próprias.
+const GMAIL_FOLDER_QUERY = {
+  inbox: 'in:inbox',
+  spam: 'in:spam',
+  trash: 'in:trash',
+};
+
+const GRAPH_FOLDER = {
+  inbox: 'inbox',
+  spam: 'junkemail',
+  trash: 'deleteditems',
+};
+
 // Limite de chamadas simultâneas à API por conta. Buscar metadados de uma
 // página inteira (até 50 mensagens) de uma vez só derrubava com "Too many
 // concurrent requests for user" — a API não aguenta tanta coisa em paralelo.
@@ -243,10 +257,12 @@ async function fetchOrderedThreadIds(account, filters) {
 // como pedir a ordem invertida direto na API).
 async function fetchOrderedGmailThreadIds(account, { folder, query, dateFrom, dateTo, sortOrder }) {
   const gmail = getGmailClient(account.accessToken);
-  const folderQuery = folder === 'trash' ? 'in:trash' : 'in:inbox';
+  const folderQuery = GMAIL_FOLDER_QUERY[folder] || GMAIL_FOLDER_QUERY.inbox;
   const dateQuery = buildGmailDateQuery(dateFrom, dateTo);
   const q = [folderQuery, dateQuery, query].filter(Boolean).join(' ');
-  const includeSpamTrash = folder === 'trash';
+  // Sem isso o Gmail simplesmente ignora o que está em SPAM/TRASH, e a busca
+  // dessas duas pastas volta vazia mesmo com o "in:" certo na query.
+  const includeSpamTrash = folder === 'trash' || folder === 'spam';
 
   const ids = [];
   let pageToken;
@@ -266,7 +282,7 @@ async function fetchOrderedGmailThreadIds(account, { folder, query, dateFrom, da
 // ($orderby); com busca ($search), o Graph não permite combinar com $orderby
 // — nesse caso ordenamos no cliente depois de baixar tudo.
 async function fetchOrderedOutlookConversationIds(account, { folder, query, dateFrom, dateTo, sortOrder }) {
-  const graphFolder = folder === 'trash' ? 'deleteditems' : 'inbox';
+  const graphFolder = GRAPH_FOLDER[folder] || GRAPH_FOLDER.inbox;
   const dateFilter = buildGraphDateFilter(dateFrom, dateTo);
 
   const params = new URLSearchParams();
@@ -430,23 +446,36 @@ async function deleteEmail(emailId, options = {}) {
     emailCache.removeEmails([emailId]);
     adjustFolderTotal(accountId, filters, -1);
   } else {
-    emailCache.moveEmails([emailId], 'inbox', 'trash');
+    // A origem pode ser a caixa de entrada ou o spam — o cache precisa tirar a
+    // linha da pasta certa, senão ela continua aparecendo lá até ressincronizar.
+    emailCache.moveEmails([emailId], folder, 'trash');
     adjustFolderTotal(accountId, filters, -1);
     adjustFolderTotal(accountId, { ...filters, folder: 'trash' }, +1);
   }
 }
 
-// Restaura uma conversa inteira da lixeira para a caixa de entrada.
+// Restaura uma conversa inteira para a caixa de entrada — da lixeira
+// ("restaurar") ou do spam ("não é spam").
 async function restoreEmail(emailId, options = {}) {
-  const { query = '', dateFrom = '', dateTo = '', sortOrder = 'desc' } = options;
-  const filters = { folder: 'trash', query, dateFrom, dateTo, sortOrder };
+  const { folder = 'trash', query = '', dateFrom = '', dateTo = '', sortOrder = 'desc' } = options;
+  const filters = { folder, query, dateFrom, dateTo, sortOrder };
   const [provider, accountId, threadKey] = emailId.split('::');
   const account = await getValidAccount(accountId);
   if (!account) throw new Error('Conta não encontrada');
 
   if (provider === 'google') {
     const gmail = getGmailClient(account.accessToken);
-    await gmail.users.threads.untrash({ userId: 'me', id: threadKey });
+    if (folder === 'spam') {
+      // untrash não serve aqui: sair do spam é tirar a label SPAM (e devolver a
+      // INBOX, que a marcação como spam removeu).
+      await gmail.users.threads.modify({
+        userId: 'me',
+        id: threadKey,
+        requestBody: { removeLabelIds: ['SPAM'], addLabelIds: ['INBOX'] },
+      });
+    } else {
+      await gmail.users.threads.untrash({ userId: 'me', id: threadKey });
+    }
   } else if (provider === 'microsoft') {
     const messageIds = await fetchOutlookConversationMessageIds(threadKey, account);
     await mapWithConcurrency(messageIds, API_CONCURRENCY, (id) =>
@@ -459,7 +488,7 @@ async function restoreEmail(emailId, options = {}) {
     throw new Error('Provedor não suportado');
   }
 
-  emailCache.moveEmails([emailId], 'trash', 'inbox');
+  emailCache.moveEmails([emailId], folder, 'inbox');
   adjustFolderTotal(accountId, filters, -1);
   adjustFolderTotal(accountId, { ...filters, folder: 'inbox' }, +1);
 }
