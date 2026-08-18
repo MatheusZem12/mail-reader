@@ -54,11 +54,16 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
           <input type="text" id="dlg-rule-name" placeholder="Ex.: Bancos" value="${escapeHtml(rule?.name || '')}" autocomplete="off">
         </div>
         <div class="form-group">
-          <label for="dlg-rule-query">Termos de busca</label>
-          <input type="text" id="dlg-rule-query" placeholder="Ex.: santander;btg;itau;bradesco" value="${escapeHtml(rule?.query || '')}" autocomplete="off">
+          <label for="dlg-rule-query">Remetentes</label>
+          <input type="text" id="dlg-rule-query" placeholder="Ex.: santander;btgpactual;kabum" value="${escapeHtml(rule?.query || '')}" autocomplete="off">
           <div class="field-hint">
-            Separe vários termos com <strong>;</strong> — a automação limpa tudo que casar
-            com qualquer um deles.
+            Separe vários com <strong>;</strong> — a automação limpa os e-mails
+            <strong>recebidos de</strong> cada um deles. O endereço de quem enviou é
+            quebrado em <strong>@ . _ -</strong> e algum pedaço tem que ser
+            <strong>igual</strong> ao que você digitar: <em>btgpactual</em> pega
+            <em>@e.btgpactual.com.br</em> e <em>btgpactual@gmail.com</em>, mas
+            <em>btg</em> não pega nada. Maiúsculas e espaços são ignorados
+            (BTG PACTUAL → btgpactual).
           </div>
         </div>
         <div class="rule-terms-preview" id="dlg-rule-preview" hidden></div>
@@ -86,10 +91,13 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
     // Mostra como o ";" foi interpretado antes de salvar — evita descobrir só
     // na hora de executar que "itau ;" virou um termo com espaço sobrando.
     const updatePreview = () => {
-      const terms = queryInput.value.split(';').map((t) => t.trim()).filter(Boolean);
+      const terms = queryInput.value
+        .split(';')
+        .map((t) => t.toLowerCase().replace(/\s+/g, '').replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+        .filter(Boolean);
       previewEl.hidden = terms.length < 2;
       if (terms.length < 2) return;
-      previewEl.innerHTML = `Vai limpar ${terms.length} termos: ` +
+      previewEl.innerHTML = `Vai limpar e-mails de ${terms.length} remetentes: ` +
         terms.map((t) => `<span class="rule-term-chip">${escapeHtml(t)}</span>`).join('');
     };
     queryInput.addEventListener('input', updatePreview);

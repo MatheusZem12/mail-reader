@@ -248,7 +248,7 @@ export async function renderListScreen(container) {
 
   // --- Aba "Automatizador" (regras de limpeza salvas) ---
   let automationRules = [];
-  let automationQuery = ''; // filtro local por nome/termo
+  let automationQuery = ''; // filtro local por nome/remetente
   let running = false; // trava reentrância enquanto alguma execução está em andamento
 
   clearReadingPane();
@@ -573,9 +573,13 @@ export async function renderListScreen(container) {
           ${ICONS.bolt}
           <p>O progresso das execuções aparece aqui</p>
           <div class="automation-empty-hint">
-            Cada automação guarda um ou mais termos separados por ";"
-            (ex.: "santander;btg;itau") e move para a lixeira tudo que casar com
-            eles. Use ⚡ para rodar uma, ou "Executar todas" para rodar todas as
+            Cada automação guarda um ou mais remetentes separados por ";" (ex.:
+            "santander;btgpactual;kabum") e move para a lixeira tudo que
+            <strong>veio</strong> deles — citar o nome no assunto ou no corpo
+            não conta. O e-mail de quem enviou é quebrado em "@", ".", "_", "-"
+            e o pedaço tem que ser igual ao que você digitou: "btgpactual" pega
+            @e.btgpactual.com.br e btgpactual@gmail.com, mas "btg" não pega
+            nada. Use ⚡ para rodar uma, ou "Executar todas" para rodar todas as
             ativadas — o interruptor de cada linha decide quem entra.
           </div>
         </div>
@@ -1076,14 +1080,77 @@ export async function renderListScreen(container) {
     return rule.enabled !== false;
   }
 
-  // O termo aceita vários valores separados por ";" — ex.: "santander;btg;itau"
-  // limpa os três de uma vez. Uma regra com um termo só continua funcionando
-  // igual (split de string sem ";" devolve ela mesma).
+  // Cada termo da regra é um DOMÍNIO de remetente, não texto livre: "btg"
+  // quer dizer "e-mails vindos de @btg...". Aceita vários separados por ";"
+  // — ex.: "santander;btg;itau" limpa os três de uma vez — e tolera o usuário
+  // digitando com "@" na frente ou o domínio completo ("kabum.com.br").
   function ruleTerms(rule) {
     return String(rule.query || '')
       .split(';')
-      .map((t) => t.trim())
+      .map((t) => normalizeDomainTerm(t))
       .filter(Boolean);
+  }
+
+  // Espaço é o único que some sem virar separador: "BTG PACTUAL" é uma palavra
+  // só ("btgpactual"). Os outros especiais ficam e valem como separador na
+  // comparação; nas pontas ("@kabum", "kabum.") são só ruído de digitação.
+  function normalizeDomainTerm(term) {
+    return String(term || '')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  }
+
+  // Endereço do remetente a partir do cabeçalho From ("Nome <x@dominio.com>").
+  // Só o endereço: o nome de exibição fica de fora de propósito, senão alguém
+  // que se chama "Kabum" mandando de um Gmail pessoal casaria sem ser da kabum.
+  function senderAddress(from) {
+    const raw = String(from || '');
+    const inAngles = raw.match(/<([^>]+)>/);
+    const address = inAngles ? inAngles[1] : (raw.match(/\S+@\S+/)?.[0] || '');
+    return address.trim().toLowerCase();
+  }
+
+  // Todo caractere que não é letra nem número separa um pedaço: "@", ".", "_",
+  // "-", "+"... Vale para o endereço e para o termo, então os dois são
+  // quebrados do mesmo jeito antes de comparar.
+  const PIECE_SEPARATOR = /[^\p{L}\p{N}]+/u;
+
+  // Comparação por pedaço, e IGUAL — nada de "começa com". Quebra o endereço
+  // inteiro nos separadores e exige que um pedaço seja idêntico ao termo:
+  //
+  //   x@e.btgpactual.com.br    →  [x, e, btgpactual, com, br]
+  //   btgpactual@gmail.com     →  [btgpactual, gmail, com]
+  //   no-reply_btgpactual@...  →  [no, reply, btgpactual, ...]
+  //   termo "btgpactual"       →  casa nos três ✓ (antes ou depois do @, tanto faz)
+  //   termo "btg"              →  nenhum pedaço é "btg", então não casa nada
+  //   termo "bb"               →  nenhum pedaço é "bb", então @abbott.com fica
+  //
+  // Termo com separador ("kabum.com.br", "btg-pactual") vale como sequência:
+  // os pedaços dele têm que aparecer na mesma ordem, um do lado do outro.
+  function addressMatchesTerm(address, term) {
+    if (!address || !term) return false;
+    const pieces = address.split(PIECE_SEPARATOR).filter(Boolean);
+    const wanted = term.split(PIECE_SEPARATOR).filter(Boolean);
+    if (wanted.length === 0 || wanted.length > pieces.length) return false;
+    return pieces.some((_, i) => wanted.every((w, j) => pieces[i + j] === w));
+  }
+
+  // O que a busca do provedor devolve ainda casa assunto/corpo — é só uma
+  // peneira grossa. Quem decide é isto aqui: sem o filtro por remetente, um
+  // e-mail que apenas *cita* "kabum" iria pra lixeira junto com os da kabum.
+  // (Numa conversa, o remetente considerado é o da última mensagem — é o que a
+  // listagem traz, igual ao que aparece na linha da lista.)
+  function senderMatchesTerm(from, term) {
+    return addressMatchesTerm(senderAddress(from), term);
+  }
+
+  // Busca enviada ao provedor: "from:" para o Gmail/Graph já filtrarem por
+  // remetente, com o termo solto no OR porque nem toda busca de provedor casa
+  // pedaço de palavra dentro do endereço — melhor trazer demais e peneirar
+  // aqui do que perder e-mail que deveria sair.
+  function ruleSearchQuery(term) {
+    return `(from:${term} OR ${term})`;
   }
 
   function formatTerms(rule) {
@@ -1157,7 +1224,7 @@ export async function renderListScreen(container) {
             <span class="automation-row-name">${escapeHtml(rule.name)}</span>
             ${on ? '' : '<span class="automation-off-badge">desativada</span>'}
           </div>
-          <div class="automation-row-line2">${ruleTerms(rule).length > 1 ? 'termos' : 'termo'}: ${escapeHtml(formatTerms(rule))} · ${automationRunSummary(rule)}</div>
+          <div class="automation-row-line2">${ruleTerms(rule).length > 1 ? 'remetentes' : 'remetente'}: ${escapeHtml(formatTerms(rule))} · ${automationRunSummary(rule)}</div>
         </div>
         <div class="automation-row-actions">
           <button class="icon-btn action-run" data-id="${escapeHtml(rule.id)}" title="Executar agora">${ICONS.boltSmall}</button>
@@ -1223,8 +1290,8 @@ export async function renderListScreen(container) {
     const values = await automationFormDialog({
       rule,
       validate: ({ name, query: q }) => {
-        if (!name || !q) return 'Preencha o nome e os termos de busca.';
-        if (ruleTerms({ query: q }).length === 0) return 'Informe pelo menos um termo de busca válido.';
+        if (!name || !q) return 'Preencha o nome e os remetentes.';
+        if (ruleTerms({ query: q }).length === 0) return 'Informe pelo menos um remetente válido.';
         const duplicate = findDuplicateName(name, isEdit ? rule.id : null);
         if (duplicate) return `Já existe uma automação chamada "${duplicate.name}". Escolha outro nome.`;
         return null;
@@ -1282,19 +1349,22 @@ export async function renderListScreen(container) {
     return all;
   }
 
-  // Busca, um termo de cada vez, tudo que casa com a regra. Sequencial de
+  // Busca, um domínio de cada vez, tudo que casa com a regra. Sequencial de
   // propósito (cada busca já pagina várias vezes no servidor) e sem repetir
   // e-mail: dois termos da mesma regra costumam cair na mesma conversa.
   async function collectRuleMatches(rule, onSearch) {
     const terms = ruleTerms(rule);
     const seen = new Set();
-    const matches = []; // { id, term } — o termo vai junto porque a exclusão o usa pra ajustar o cache
+    const matches = []; // { id, query } — a query vai junto porque a exclusão a usa pra ajustar o cache
     for (let i = 0; i < terms.length; i++) {
       onSearch?.({ term: terms[i], index: i, total: terms.length, found: matches.length });
-      for (const email of await collectMatchingEmails(terms[i])) {
+      const searchQuery = ruleSearchQuery(terms[i]);
+      for (const email of await collectMatchingEmails(searchQuery)) {
         if (seen.has(email.id)) continue;
+        // Só sai o que veio DO domínio; citação no assunto/corpo não conta.
+        if (!senderMatchesTerm(email.from, terms[i])) continue;
         seen.add(email.id);
-        matches.push({ id: email.id, term: terms[i] });
+        matches.push({ id: email.id, query: searchQuery });
       }
     }
     return matches;
@@ -1313,10 +1383,10 @@ export async function renderListScreen(container) {
     // circuitados (evita disparar dezenas de requests condenados).
     let networkDown = false;
     onProgress?.({ done: 0, total: matches.length });
-    const results = await mapWithConcurrencySettled(matches, DELETE_CONCURRENCY, async ({ id, term }) => {
+    const results = await mapWithConcurrencySettled(matches, DELETE_CONCURRENCY, async ({ id, query: searchQuery }) => {
       if (networkDown) throw new Error('offline');
       try {
-        const r = await deleteEmail(id, { permanent: false, folder: 'inbox', query: term });
+        const r = await deleteEmail(id, { permanent: false, folder: 'inbox', query: searchQuery });
         done++;
         onProgress?.({ done, total: matches.length });
         return r;
@@ -1457,8 +1527,8 @@ export async function renderListScreen(container) {
     return runRules([rule], {
       confirmTitle: `Executar "${rule.name}"?`,
       confirmMessage: terms.length > 1
-        ? `Isso vai procurar todos os e-mails que contêm qualquer um destes ${terms.length} termos — ${formatTerms(rule)} — e movê-los para a lixeira.`
-        : `Isso vai procurar todos os e-mails que contêm "${terms[0] || rule.query}" e movê-los para a lixeira.`,
+        ? `Isso vai procurar todos os e-mails recebidos de qualquer um destes ${terms.length} remetentes — ${formatTerms(rule)} — e movê-los para a lixeira.`
+        : `Isso vai procurar todos os e-mails recebidos de "${terms[0] || rule.query}" e movê-los para a lixeira.`,
       panelTitle: rule.name,
     });
   }
@@ -1469,7 +1539,7 @@ export async function renderListScreen(container) {
     const plural = rules.length === 1 ? '' : 's';
     return runRules(rules, {
       confirmTitle: `Executar ${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}?`,
-      confirmMessage: 'As automações desativadas ficam de fora. Todos os e-mails que casarem com os termos serão movidos para a lixeira.',
+      confirmMessage: 'As automações desativadas ficam de fora. Todos os e-mails recebidos dos remetentes cadastrados serão movidos para a lixeira.',
       panelTitle: `${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}`,
     });
   }

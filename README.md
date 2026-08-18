@@ -75,7 +75,7 @@ A configuração no Google/Azure é feita **uma vez só**. No novo computador, c
 - Busca por remetente, assunto e conteúdo, com filtro por período e ordenação
 - Seleção múltipla, exclusão e restauração em lote
 - **Domínios:** agrupa os remetentes por domínio, mostrando de quais sites/serviços você recebe e-mail (e quantos) — com um clique você filtra a caixa por aquele domínio
-- **Automatizador:** regras de limpeza salvas — cada regra guarda um termo e, ao ser executada, move para a lixeira todos os e-mails da caixa que contêm esse termo (remetente, assunto ou conteúdo)
+- **Automatizador:** regras de limpeza salvas — cada regra guarda um ou mais **remetentes** separados por `;` (ex.: `btgpactual;santander;kabum`) e, ao ser executada, move para a lixeira todos os e-mails **recebidos de** cada um deles. Citar o nome no assunto ou no corpo não conta: o endereço de quem enviou é quebrado em todo caractere especial (`@ . _ - +`) e algum pedaço tem que ser **igual** ao termo — `btgpactual` casa com `x@e.btgpactual.com.br`, `btgpactual@gmail.com` e `no-reply_btgpactual@mkt.com`, enquanto `btg` não casa nada e `bb` não pega `@abbott.com`. O que você digita é normalizado para minúsculo e sem espaço (`BTG PACTUAL` → `btgpactual`); termo com separador (`kabum.com.br`, `btg-pactual`) exige os pedaços na mesma ordem, colados
 - Zoom ajustável do corpo do e-mail
 - Cache local criptografado (abertura instantânea, menos requests)
 - Armazenamento 100% local: tokens e cache criptografados com o `safeStorage` do Electron
