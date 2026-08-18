@@ -2,10 +2,12 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-// Regras de automação ("limpadores"): cada regra guarda um termo de busca e,
-// quando executada, move para a lixeira todos os e-mails da caixa de entrada
-// que casem com esse termo (remetente/assunto/conteúdo). É só metadado local —
-// a execução em si reaproveita a busca + exclusão que já existem.
+// Regras de automação ("limpadores"): cada regra guarda um ou mais remetentes
+// e, quando executada, move para a lixeira todos os e-mails da caixa de
+// entrada RECEBIDOS deles — o e-mail de quem enviou é quebrado nos caracteres
+// especiais e algum pedaço tem que ser igual ao termo (menção no assunto/corpo
+// não conta — quem filtra isso é o renderer). É só metadado local — a execução
+// em si reaproveita a busca + exclusão que já existem.
 const RULES_FILE = 'automation-rules.json';
 
 function getRulesPath() {
