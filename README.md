@@ -48,8 +48,9 @@ O app te guia com links e tutorial na própria tela de configuração. Resumo:
 2. Ative a [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
 3. Configure a **OAuth consent screen** (tipo **External**).
 4. Em [Audience → Test users](https://console.cloud.google.com/auth/audience), **adicione seu Gmail** (sem isso o login dá erro 403).
-5. Em **Credentials → Create Credentials → OAuth client ID**, tipo **Desktop app**.
-6. Copie o **Client ID** (`...apps.googleusercontent.com`) e o **Client Secret** (`GOCSPX-...`) e cole na tela de configuração do app.
+5. Ainda em [Audience](https://console.cloud.google.com/auth/audience), clique em **Publicar app** (status **Em produção**). ⚠️ Enquanto o projeto ficar em **Testing**, o Google **expira o refresh token a cada 7 dias** e você precisa refazer o login toda semana. Publicado, a sessão não expira sozinha. Como o escopo do Gmail é sensível, o login passa a mostrar um aviso de "app não verificado" — vá em **Avançado → Acessar (não seguro)**; a verificação do Google só é necessária para distribuir o app a outras pessoas.
+6. Em **Credentials → Create Credentials → OAuth client ID**, tipo **Desktop app**.
+7. Copie o **Client ID** (`...apps.googleusercontent.com`) e o **Client Secret** (`GOCSPX-...`) e cole na tela de configuração do app.
 
 ### Microsoft (Outlook)
 
