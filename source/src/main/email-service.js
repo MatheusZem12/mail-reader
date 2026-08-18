@@ -602,7 +602,14 @@ async function getValidAccount(accountId) {
     console.error('Erro ao renovar token:', err);
     const message = err.message || '';
     if (/invalid_grant|revoked|expired/i.test(message)) {
-      throw new Error('autorização revogada ou expirada, reconecte a conta');
+      // Quando isso volta a cada ~7 dias não é a conta: é o projeto no Google
+      // Cloud parado em "Testing", modo em que o Google expira o refresh token
+      // nesse prazo. Publicar o app (Audience → Publicar app) resolve de vez.
+      throw new Error(
+        account.provider === 'google'
+          ? 'autorização expirada, reconecte a conta. Se isso acontece toda semana, publique seu app no Google Cloud (Audience → Publicar app): em "Testing" o Google expira o acesso a cada 7 dias.'
+          : 'autorização revogada ou expirada, reconecte a conta'
+      );
     }
     throw new Error(`falha ao renovar sessão: ${message}`);
   }

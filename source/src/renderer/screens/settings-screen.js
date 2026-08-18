@@ -46,6 +46,7 @@ export async function renderSettingsScreen(container) {
                 <li>Ative a <strong>Gmail API</strong> pelo link acima.</li>
                 <li>Configure a <strong>OAuth consent screen</strong> (tipo <strong>External</strong>).</li>
                 <li>Em <strong>Audience → Test users</strong>, adicione o seu Gmail (sem isso o login dá erro 403).</li>
+                <li>Ainda em <strong>Audience</strong>, clique em <strong>Publicar app</strong> (status <strong>Em produção</strong>). Enquanto ficar em <strong>Testing</strong>, o Google <strong>expira a autorização a cada 7 dias</strong> e você tem que fazer login de novo toda semana. Publicado, a sessão dura indefinidamente — no login aparece um aviso de "app não verificado", é só ir em <em>Avançado → Acessar (não seguro)</em>, já que o app é seu e roda só na sua máquina.</li>
                 <li>Em <strong>Credentials → Create Credentials → OAuth client ID</strong>, tipo <strong>Desktop app</strong>.</li>
                 <li>Copie o <strong>Client ID</strong> (termina em <code>.apps.googleusercontent.com</code>) e o <strong>Client Secret</strong> (começa com <code>GOCSPX-</code>) para os campos acima.</li>
               </ol>
