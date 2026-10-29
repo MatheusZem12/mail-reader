@@ -13,7 +13,7 @@ function getClient() {
   const clientId = oauthConfig.getClientId('google');
   if (!clientId) {
     throw new Error(
-      'Google OAuth não configurado. Defina MAIL_READER_GOOGLE_CLIENT_ID no arquivo .env (veja o README).'
+      'Google OAuth is not configured. Set MAIL_READER_GOOGLE_CLIENT_ID in the .env file (see the README).'
     );
   }
   return new google.auth.OAuth2(clientId, oauthConfig.getClientSecret('google'), REDIRECT_URI);
@@ -28,16 +28,16 @@ function startCallbackServer() {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       if (code) {
-        res.end('<h1>Autorização concluída!</h1><p>Você pode fechar esta janela.</p>');
+        res.end('<h1>Authorization complete!</h1><p>You can close this window.</p>');
         server.close(() => resolve(code));
       } else {
-        res.end(`<h1>Erro na autorização</h1><p>${error || 'Desconhecido'}</p>`);
-        server.close(() => reject(new Error(error || 'Autorização negada')));
+        res.end(`<h1>Authorization error</h1><p>${error || 'Unknown'}</p>`);
+        server.close(() => reject(new Error(error || 'Authorization denied')));
       }
     });
 
     server.listen(REDIRECT_PORT, () => {
-      console.log('Aguardando callback OAuth na porta', REDIRECT_PORT);
+      console.log('Waiting for the OAuth callback on port', REDIRECT_PORT);
     });
 
     server.on('error', reject);
@@ -47,9 +47,9 @@ function startCallbackServer() {
 async function startAuthFlow() {
   const oauth2Client = getClient();
 
-  // Só força o consentimento completo se ainda não temos um refresh token.
-  // Pedir consentimento toda vez gera um novo refresh token e pode invalidar
-  // o anterior, além de ser desnecessário para reconectar uma conta já autorizada.
+  // Only forces full consent if we don't have a refresh token yet.
+  // Asking for consent every time generates a new refresh token and can invalidate
+  // the previous one, besides being unnecessary to reconnect an already authorized account.
   const existingAccounts = accountStore.getAccounts();
   const hasExistingGoogleAccount = existingAccounts.some((a) => a.provider === 'google');
 
@@ -71,18 +71,18 @@ async function startAuthFlow() {
   const { tokens } = await oauth2Client.getToken(code);
 
   oauth2Client.setCredentials(tokens);
-  // Identifica a conta pelo próprio Gmail: o escopo https://mail.google.com/
-  // não cobre o endpoint de userinfo (exigiria openid/email), mas cobre getProfile.
+  // Identifies the account through Gmail itself: the https://mail.google.com/ scope
+  // doesn't cover the userinfo endpoint (it would need openid/email), but it covers getProfile.
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
   const { data: profile } = await gmail.users.getProfile({ userId: 'me' });
 
   const accountId = `google-${profile.emailAddress}`;
   const existingAccount = accountStore.getAccountWithToken(accountId);
 
-  // Se não veio refresh token e não temos um salvo, precisamos forçar consentimento.
+  // If no refresh token came and we have none saved, we must force consent.
   if (!tokens.refresh_token && !existingAccount?.refreshToken) {
     throw new Error(
-      'O Google não devolveu um token de atualização. Remova a conta e conecte novamente com consentimento completo.'
+      'Google returned no refresh token. Remove the account and connect it again with full consent.'
     );
   }
 

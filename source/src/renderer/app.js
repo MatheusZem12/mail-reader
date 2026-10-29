@@ -17,7 +17,7 @@ export function navigate(screen, params = {}) {
   render();
 }
 
-// Depois do aceite dos termos: sem provedor configurado → tela de configuração.
+// After the terms are accepted: no provider configured → the setup screen.
 export async function routeAfterTerms() {
   const status = await getOAuthStatus();
   navigate(!status.google && !status.microsoft ? 'settings' : 'login');

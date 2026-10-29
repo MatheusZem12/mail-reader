@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$SCRIPT_DIR/source"
 
-# Garante que o Electron não rode no modo "Node.js only".
+# Makes sure Electron doesn't run in "Node.js only" mode.
 export ELECTRON_RUN_AS_NODE=
 
 npm start

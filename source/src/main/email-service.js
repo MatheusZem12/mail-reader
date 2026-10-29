@@ -5,8 +5,8 @@ const emailCache = require('./storage/email-cache');
 
 const PAGE_SIZE = 50;
 
-// Pastas de e-mail (as que listam mensagens de verdade) e como cada provedor
-// as chama. "Domínios" e "Automatizador" não entram aqui: são telas próprias.
+// Mail folders (the ones that actually list messages) and what each provider
+// calls them. "Domains" and "Automator" aren't here: they are screens of their own.
 const GMAIL_FOLDER_QUERY = {
   inbox: 'in:inbox',
   spam: 'in:spam',
@@ -19,9 +19,9 @@ const GRAPH_FOLDER = {
   trash: 'deleteditems',
 };
 
-// Limite de chamadas simultâneas à API por conta. Buscar metadados de uma
-// página inteira (até 50 mensagens) de uma vez só derrubava com "Too many
-// concurrent requests for user" — a API não aguenta tanta coisa em paralelo.
+// Limit of simultaneous API calls per account. Fetching the metadata of a whole
+// page (up to 50 messages) at once kept failing with "Too many concurrent
+// requests for user" — the API can't take that much in parallel.
 const API_CONCURRENCY = 5;
 
 async function mapWithConcurrency(items, limit, fn) {
@@ -37,12 +37,12 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-// Sessão de listagem por conta+pasta+busca+período+ordem: guarda a lista
-// COMPLETA de ids (threadId no Gmail, conversationId no Outlook) já na ordem
-// certa de exibição, montada uma vez (barato: só ids, sem metadados), e cada
-// "carregar mais" apenas avança um offset sobre essa lista, buscando os
-// metadados completos (caro) só da fatia pedida. Vive só na memória do
-// processo — não persiste entre reinícios do app.
+// A listing session per account+folder+search+period+order: it keeps the
+// COMPLETE list of ids (threadId on Gmail, conversationId on Outlook) already in
+// display order, built once (cheap: only ids, no metadata), and each "load
+// more" just moves an offset over that list, fetching the full (expensive)
+// metadata only for the requested slice. It lives only in the process memory
+// — it doesn't persist across app restarts.
 const pageCursors = new Map();
 
 function buildCursorKey(accountId, filters) {
@@ -62,9 +62,9 @@ async function listEmails(options = {}) {
     currentEmails = [],
   } = options;
   const filters = { folder, query, dateFrom, dateTo, sortOrder };
-  // Qualquer filtro fora do padrão (busca, período ou ordem invertida) sempre
-  // vai ao servidor — o cache local de pastas só serve pra listagem cronológica
-  // padrão (mais recentes primeiro, sem filtro nenhum).
+  // Any non-default filter (search, period or reversed order) always goes to
+  // the server — the local folder cache only serves the default chronological
+  // listing (newest first, no filter at all).
   const isDefaultView = !query && !dateFrom && !dateTo && sortOrder === 'desc';
 
   if (loadMore) {
@@ -83,14 +83,14 @@ async function listEmails(options = {}) {
     return { emails: [], syncedAt: Date.now(), fromCache: false, errors: [], hasMore: false, total: isDefaultView ? 0 : null };
   }
 
-  // Busca todas as contas em paralelo (primeira página); falha em uma conta não derruba as outras.
+  // Fetches every account in parallel (first page); a failure in one account doesn't take down the others.
   const errors = [];
   const results = await Promise.all(
     accounts.map(async (account) => {
       try {
         const accountWithToken = await getValidAccount(account.id);
         if (!accountWithToken) {
-          errors.push(`${account.email}: sessão expirada, reconecte a conta`);
+          errors.push(`${account.email}: session expired, reconnect the account`);
           return { emails: [], hasMore: false, total: null };
         }
         return await listEmailsForAccount(accountWithToken, filters, false);
@@ -109,8 +109,8 @@ async function listEmails(options = {}) {
     throw new Error(errors.join('\n'));
   }
 
-  // Com qualquer filtro fora do padrão, não faz sentido guardar no cache de
-  // pastas (que é só para a listagem cronológica normal).
+  // With any non-default filter, it makes no sense to store it in the folder
+  // cache (which is only for the normal chronological listing).
   if (!isDefaultView) {
     return { emails: allEmails, syncedAt: Date.now(), fromCache: false, errors, hasMore, total };
   }
@@ -119,16 +119,16 @@ async function listEmails(options = {}) {
   return { emails: allEmails, syncedAt: Date.now(), fromCache: false, errors, hasMore, total };
 }
 
-// Soma o total entre contas; se nenhuma conta conseguiu informar um total,
-// devolve null (para a UI mostrar só a contagem carregada, sem "de Y").
+// Adds up the total across accounts; if no account could report a total,
+// returns null (so the UI shows only the loaded count, without "of Y").
 function combineTotals(results) {
   if (results.every((r) => r.total == null)) return null;
   return results.reduce((sum, r) => sum + (r.total || 0), 0);
 }
 
-// Busca a próxima página (por conta) usando a sessão já montada. Na listagem
-// padrão, mescla com o que está no cache local; com qualquer filtro ativo,
-// mescla com o que o renderer já tinha carregado (currentEmails).
+// Fetches the next page (per account) using the session already built. In the
+// default listing, it merges with what is in the local cache; with any active
+// filter, it merges with what the renderer had already loaded (currentEmails).
 async function loadMoreEmails(filters, currentEmails) {
   const accounts = accountStore.getAccounts();
   const errors = [];
@@ -173,7 +173,7 @@ function dedupeAndSort(emails, sortOrder = 'desc') {
   return list;
 }
 
-// Gmail: "before:" é exclusivo, por isso soma 1 dia à data final pra incluí-la.
+// Gmail: "before:" is exclusive, so it adds 1 day to the end date to include it.
 function addOneDay(dateStr) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
@@ -197,10 +197,10 @@ function buildGraphDateFilter(dateFrom, dateTo) {
 async function listEmailsForAccount(account, filters, more) {
   const cursorKey = buildCursorKey(account.id, filters);
 
-  // Primeira página da sessão: monta a lista completa de ids (na ordem certa)
-  // do zero. Isso já nos dá de graça um total EXATO (é só o tamanho da lista),
-  // em vez de estimativas que o Gmail/Graph dão e que podem variar a cada
-  // chamada mesmo sem nada ter mudado.
+  // First page of the session: builds the complete list of ids (in the right
+  // order) from scratch. That gives us an EXACT total for free (it's just the list
+  // size), instead of the estimates Gmail/Graph give, which can vary on every
+  // call even with nothing changed.
   if (!more) {
     const ids = await fetchOrderedThreadIds(account, filters);
     pageCursors.set(cursorKey, { ids, offset: 0, total: ids.length });
@@ -217,8 +217,8 @@ async function listEmailsForAccount(account, filters, more) {
 
   if (account.provider === 'google') {
     const gmail = getGmailClient(account.accessToken);
-    // Metadados buscados em paralelo, mas com limite de concorrência (sequencial
-    // levava ~20x mais tempo; sem limite, a API rejeitava com "too many concurrent requests").
+    // Metadata fetched in parallel, but with a concurrency limit (sequential
+    // took ~20x longer; without a limit, the API rejected it with "too many concurrent requests").
     const details = await mapWithConcurrency(pageIds, API_CONCURRENCY, (threadId) =>
       gmail.users.threads.get({
         userId: 'me',
@@ -250,18 +250,18 @@ async function fetchOrderedThreadIds(account, filters) {
   return [];
 }
 
-// Coleta TODOS os ids de conversa que batem com o filtro (só o id, sem
-// metadados — barato mesmo pra caixas com milhares de e-mails). O Gmail
-// sempre devolve na ordem mais recente → mais antiga; pra "mais antigos
-// primeiro" só precisamos inverter essa lista já coletada (o Gmail não tem
-// como pedir a ordem invertida direto na API).
+// Collects ALL conversation ids matching the filter (just the id, no
+// metadata — cheap even for mailboxes with thousands of e-mails). Gmail
+// always returns newest → oldest; for "oldest first" we only need to
+// reverse the already collected list (Gmail has no way to ask for the
+// reversed order directly in the API).
 async function fetchOrderedGmailThreadIds(account, { folder, query, dateFrom, dateTo, sortOrder }) {
   const gmail = getGmailClient(account.accessToken);
   const folderQuery = GMAIL_FOLDER_QUERY[folder] || GMAIL_FOLDER_QUERY.inbox;
   const dateQuery = buildGmailDateQuery(dateFrom, dateTo);
   const q = [folderQuery, dateQuery, query].filter(Boolean).join(' ');
-  // Sem isso o Gmail simplesmente ignora o que está em SPAM/TRASH, e a busca
-  // dessas duas pastas volta vazia mesmo com o "in:" certo na query.
+  // Without this Gmail simply ignores what is in SPAM/TRASH, and searching
+  // those two folders comes back empty even with the right "in:" in the query.
   const includeSpamTrash = folder === 'trash' || folder === 'spam';
 
   const ids = [];
@@ -275,12 +275,12 @@ async function fetchOrderedGmailThreadIds(account, { folder, query, dateFrom, da
   return sortOrder === 'asc' ? ids.reverse() : ids;
 }
 
-// Equivalente pro Outlook: o Graph não tem uma API de "threads", então
-// buscamos id+conversationId+data de TODAS as mensagens que batem com o
-// filtro (campos leves, sem corpo) e deduplicamos por conversationId mantendo
-// a ordem certa. Sem busca de texto, o próprio Graph já ordena por data
-// ($orderby); com busca ($search), o Graph não permite combinar com $orderby
-// — nesse caso ordenamos no cliente depois de baixar tudo.
+// The Outlook equivalent: Graph has no "threads" API, so we fetch
+// id+conversationId+date of ALL messages matching the filter (light fields,
+// no body) and deduplicate by conversationId keeping the right order.
+// Without a text search, Graph itself sorts by date ($orderby); with a search
+// ($search), Graph doesn't allow combining it with $orderby
+// — in that case we sort on the client after downloading everything.
 async function fetchOrderedOutlookConversationIds(account, { folder, query, dateFrom, dateTo, sortOrder }) {
   const graphFolder = GRAPH_FOLDER[folder] || GRAPH_FOLDER.inbox;
   const dateFilter = buildGraphDateFilter(dateFrom, dateTo);
@@ -322,10 +322,10 @@ async function fetchOrderedOutlookConversationIds(account, { folder, query, date
   return orderedConversationIds;
 }
 
-// Mantém o total de uma sessão de listagem já em cache sincronizado com
-// exclusões/restaurações, sem precisar recontar no servidor a cada mutação.
-// Se não há uma sessão em cache pra esse filtro (ex.: app acabou de abrir),
-// não faz nada — a próxima listagem já vai contar certo do zero.
+// Keeps the total of an already cached listing session in sync with
+// deletions/restores, without recounting on the server on every mutation.
+// If there's no cached session for this filter (e.g. the app just opened),
+// it does nothing — the next listing will count correctly from scratch.
 function adjustFolderTotal(accountId, filters, delta) {
   const cursorKey = buildCursorKey(accountId, filters);
   const session = pageCursors.get(cursorKey);
@@ -334,8 +334,8 @@ function adjustFolderTotal(accountId, filters, delta) {
   }
 }
 
-// Busca o resumo (sem corpo) de todas as mensagens de uma conversa do Outlook,
-// para montar uma linha de listagem agregada (equivalente ao threads.get do Gmail).
+// Fetches the summary (no body) of every message in an Outlook conversation,
+// to build an aggregated listing row (the equivalent of Gmail's threads.get).
 async function fetchOutlookThreadSummary(conversationId, account) {
   const messages = await fetchOutlookConversationMessages(
     conversationId,
@@ -345,8 +345,8 @@ async function fetchOutlookThreadSummary(conversationId, account) {
   return mapMicrosoftThread(messages.map((m) => mapMicrosoftMessage(m, account)), conversationId, account);
 }
 
-// Busca todas as mensagens de uma conversa do Outlook (independente de paginação),
-// usada tanto para listar quanto para abrir/excluir/restaurar a conversa inteira.
+// Fetches every message in an Outlook conversation (regardless of paging),
+// used both to list and to open/delete/restore the whole conversation.
 async function fetchOutlookConversationMessages(conversationId, account, select) {
   const filterValue = conversationId.replace(/'/g, "''");
   const url = `/me/messages?$select=${select}&$filter=${encodeURIComponent(`conversationId eq '${filterValue}'`)}&$orderby=receivedDateTime&$top=100`;
@@ -355,9 +355,9 @@ async function fetchOutlookConversationMessages(conversationId, account, select)
 }
 
 async function getEmail(emailId) {
-  // Corpo já visto fica no cache local — reabrir é instantâneo e sem request.
-  // Cache de antes desta versão (por mensagem, sem array `messages`) não bate
-  // com o formato atual (por conversa): refaz o fetch.
+  // A body already seen stays in the local cache — reopening is instant, with no request.
+  // A cache from before this version (per message, without a `messages` array) doesn't
+  // match the current (per conversation) format: fetch again.
   const cached = emailCache.getBody(emailId);
   if (cached && Array.isArray(cached.messages)) return cached;
 
@@ -366,12 +366,12 @@ async function getEmail(emailId) {
   return email;
 }
 
-// Busca a conversa inteira (todas as mensagens), não só uma mensagem — pra
-// exibir tudo empilhado numa mensagem só, como o Gmail faz.
+// Fetches the whole conversation (every message), not just one message — to
+// show it all stacked in a single message, as Gmail does.
 async function fetchThread(emailId) {
   const [provider, accountId, threadKey] = emailId.split('::');
   const account = await getValidAccount(accountId);
-  if (!account) throw new Error('Conta não encontrada');
+  if (!account) throw new Error('Account not found');
 
   if (provider === 'google') {
     const gmail = getGmailClient(account.accessToken);
@@ -389,7 +389,7 @@ async function fetchThread(emailId) {
     return buildThreadDetail(emailId, account, messages.map((msg) => mapMicrosoftMessageDetail(msg, account)));
   }
 
-  throw new Error('Provedor não suportado');
+  throw new Error('Unsupported provider');
 }
 
 function buildThreadDetail(emailId, account, messages) {
@@ -400,15 +400,15 @@ function buildThreadDetail(emailId, account, messages) {
     provider: account.provider,
     accountId: account.id,
     accountEmail: account.email,
-    subject: last?.subject || '(sem assunto)',
+    subject: last?.subject || '(no subject)',
     messageCount: sorted.length,
     messages: sorted,
   };
 }
 
-// Exclusão padrão: move para a lixeira (recuperável). Com { permanent: true },
-// apaga de vez (usado na aba Lixeira). Age sobre a conversa inteira — igual ao
-// Gmail, onde excluir uma linha da lista joga todas as mensagens dela fora.
+// Default deletion: moves to the trash (recoverable). With { permanent: true },
+// deletes for good (used on the Trash tab). It acts on the whole conversation —
+// like Gmail, where deleting a list row throws all of its messages away.
 async function deleteEmail(emailId, options = {}) {
   const {
     permanent = false,
@@ -421,7 +421,7 @@ async function deleteEmail(emailId, options = {}) {
   const filters = { folder, query, dateFrom, dateTo, sortOrder };
   const [provider, accountId, threadKey] = emailId.split('::');
   const account = await getValidAccount(accountId);
-  if (!account) throw new Error('Conta não encontrada');
+  if (!account) throw new Error('Account not found');
 
   if (provider === 'google') {
     const gmail = getGmailClient(account.accessToken);
@@ -431,43 +431,43 @@ async function deleteEmail(emailId, options = {}) {
       await gmail.users.threads.trash({ userId: 'me', id: threadKey });
     }
   } else if (provider === 'microsoft') {
-    // Sem "delete de conversa" no Graph: buscamos todas as mensagens dessa
-    // conversa (não só as já carregadas na tela) e apagamos uma por uma.
+    // No "conversation delete" in Graph: we fetch every message of this
+    // conversation (not only the ones loaded on screen) and delete them one by one.
     const messageIds = await fetchOutlookConversationMessageIds(threadKey, account);
     await mapWithConcurrency(messageIds, API_CONCURRENCY, (id) =>
-      // No Graph, DELETE na inbox move para "Itens Excluídos"; na lixeira, remove de vez.
+      // In Graph, DELETE in the inbox moves to "Deleted Items"; in the trash, it removes for good.
       graphRequest(`/me/messages/${id}`, account.accessToken, { method: 'DELETE' })
     );
   } else {
-    throw new Error('Provedor não suportado');
+    throw new Error('Unsupported provider');
   }
 
   if (permanent) {
     emailCache.removeEmails([emailId]);
     adjustFolderTotal(accountId, filters, -1);
   } else {
-    // A origem pode ser a caixa de entrada ou o spam — o cache precisa tirar a
-    // linha da pasta certa, senão ela continua aparecendo lá até ressincronizar.
+    // The origin can be the inbox or spam — the cache must remove the row from
+    // the right folder, otherwise it keeps showing there until the next sync.
     emailCache.moveEmails([emailId], folder, 'trash');
     adjustFolderTotal(accountId, filters, -1);
     adjustFolderTotal(accountId, { ...filters, folder: 'trash' }, +1);
   }
 }
 
-// Restaura uma conversa inteira para a caixa de entrada — da lixeira
-// ("restaurar") ou do spam ("não é spam").
+// Restores a whole conversation to the inbox — from the trash
+// ("restore") or from spam ("not spam").
 async function restoreEmail(emailId, options = {}) {
   const { folder = 'trash', query = '', dateFrom = '', dateTo = '', sortOrder = 'desc' } = options;
   const filters = { folder, query, dateFrom, dateTo, sortOrder };
   const [provider, accountId, threadKey] = emailId.split('::');
   const account = await getValidAccount(accountId);
-  if (!account) throw new Error('Conta não encontrada');
+  if (!account) throw new Error('Account not found');
 
   if (provider === 'google') {
     const gmail = getGmailClient(account.accessToken);
     if (folder === 'spam') {
-      // untrash não serve aqui: sair do spam é tirar a label SPAM (e devolver a
-      // INBOX, que a marcação como spam removeu).
+      // untrash won't do here: leaving spam means removing the SPAM label (and giving
+      // back the INBOX label, which marking as spam removed).
       await gmail.users.threads.modify({
         userId: 'me',
         id: threadKey,
@@ -485,7 +485,7 @@ async function restoreEmail(emailId, options = {}) {
       })
     );
   } else {
-    throw new Error('Provedor não suportado');
+    throw new Error('Unsupported provider');
   }
 
   emailCache.moveEmails([emailId], folder, 'inbox');
@@ -498,8 +498,8 @@ async function fetchOutlookConversationMessageIds(conversationId, account) {
   return messages.map((m) => m.id);
 }
 
-// Esvazia a lixeira de todas as contas — apaga PERMANENTEMENTE tudo o que
-// estiver lá, não só o que já foi carregado na tela.
+// Empties the trash of every account — PERMANENTLY deletes everything in
+// there, not only what was already loaded on screen.
 async function emptyTrash() {
   const accounts = accountStore.getAccounts();
   const errors = [];
@@ -509,7 +509,7 @@ async function emptyTrash() {
       try {
         const accountWithToken = await getValidAccount(account.id);
         if (!accountWithToken) {
-          errors.push(`${account.email}: sessão expirada, reconecte a conta`);
+          errors.push(`${account.email}: session expired, reconnect the account`);
           return;
         }
         if (accountWithToken.provider === 'google') await emptyGmailTrash(accountWithToken);
@@ -521,8 +521,8 @@ async function emptyTrash() {
   );
 
   emailCache.clearFolder('trash');
-  // Cursores de paginação da lixeira ficariam apontando pra páginas que não
-  // existem mais depois do esvaziamento.
+  // Trash paging cursors would point to pages that no longer exist
+  // after emptying it.
   for (const key of [...pageCursors.keys()]) {
     if (/:trash:/.test(key)) pageCursors.delete(key);
   }
@@ -530,9 +530,9 @@ async function emptyTrash() {
   if (errors.length > 0) throw new Error(errors.join('\n'));
 }
 
-// Gmail não tem "esvaziar lixeira" num único request: lista todos os ids de
-// mensagem em TRASH (paginando) e apaga em lotes de até 1000 via batchDelete
-// (bem mais rápido que apagar um por um).
+// Gmail has no single-request "empty trash": it lists every message id in
+// TRASH (paging) and deletes them in batches of up to 1000 via batchDelete
+// (much faster than deleting one by one).
 async function emptyGmailTrash(account) {
   const gmail = getGmailClient(account.accessToken);
   const ids = [];
@@ -554,8 +554,8 @@ async function emptyGmailTrash(account) {
   }
 }
 
-// Graph não tem uma ação de "esvaziar pasta": lista todos os ids da pasta
-// Itens Excluídos (paginando) e apaga um por um (DELETE ali já é definitivo).
+// Graph has no "empty folder" action: it lists every id in the Deleted Items
+// folder (paging) and deletes them one by one (DELETE there is already final).
 async function emptyOutlookTrash(account) {
   const ids = [];
   let url = `/me/mailFolders/deleteditems/messages?$select=id&$top=100`;
@@ -580,7 +580,7 @@ async function getValidAccount(accountId) {
   try {
     if (account.provider === 'google') {
       if (!account.refreshToken) {
-        throw new Error('token de atualização ausente, reconecte a conta');
+        throw new Error('refresh token missing, reconnect the account');
       }
       const { refreshAccessToken } = require('./auth/google-auth');
       const tokens = await refreshAccessToken(account.refreshToken);
@@ -589,7 +589,7 @@ async function getValidAccount(accountId) {
       account.expiresAt = tokens.expiresAt;
     } else if (account.provider === 'microsoft') {
       if (!account.msalAccount) {
-        throw new Error('sessão do Outlook expirada, reconecte a conta');
+        throw new Error('Outlook session expired, reconnect the account');
       }
       const { refreshAccessToken } = require('./auth/microsoft-auth');
       const tokens = await refreshAccessToken(account.msalAccount);
@@ -599,19 +599,19 @@ async function getValidAccount(accountId) {
       account.msalAccount = tokens.account;
     }
   } catch (err) {
-    console.error('Erro ao renovar token:', err);
+    console.error('Error renewing the token:', err);
     const message = err.message || '';
     if (/invalid_grant|revoked|expired/i.test(message)) {
-      // Quando isso volta a cada ~7 dias não é a conta: é o projeto no Google
-      // Cloud parado em "Testing", modo em que o Google expira o refresh token
-      // nesse prazo. Publicar o app (Audience → Publicar app) resolve de vez.
+      // When this comes back every ~7 days it isn't the account: it's the Google Cloud
+      // project stuck in "Testing", a mode in which Google expires the refresh token
+      // within that period. Publishing the app (Audience → Publish app) fixes it for good.
       throw new Error(
         account.provider === 'google'
-          ? 'autorização expirada, reconecte a conta. Se isso acontece toda semana, publique seu app no Google Cloud (Audience → Publicar app): em "Testing" o Google expira o acesso a cada 7 dias.'
-          : 'autorização revogada ou expirada, reconecte a conta'
+          ? 'authorization expired, reconnect the account. If this happens every week, publish your app in Google Cloud (Audience → Publish app): in "Testing" Google expires access every 7 days.'
+          : 'authorization revoked or expired, reconnect the account'
       );
     }
-    throw new Error(`falha ao renovar sessão: ${message}`);
+    throw new Error(`failed to renew the session: ${message}`);
   }
 
   return account;
@@ -628,21 +628,21 @@ function mapGmailMessage(msg, account) {
     accountId: account.id,
     provider: 'google',
     accountEmail: account.email,
-    subject: getHeader('Subject') || '(sem assunto)',
+    subject: getHeader('Subject') || '(no subject)',
     from: parseAddress(getHeader('From')),
     to: parseAddressList(getHeader('To')),
     date: new Date(parseInt(msg.internalDate, 10)).toISOString(),
-    // snippet vem como texto puro com entidades HTML (não é base64)
+    // the snippet comes as plain text with HTML entities (it isn't base64)
     snippet: decodeHtmlEntities(msg.snippet || ''),
     isRead: !(msg.labelIds || []).includes('UNREAD'),
   };
 }
 
-// Constrói a linha de listagem de uma conversa a partir do retorno de
-// threads.get(format:'metadata'), que já traz todas as mensagens da thread.
-// Usa a última mensagem para assunto/remetente/data/trecho (é o que aparece
-// mais recente na conversa) e conta como "não lida" se QUALQUER mensagem
-// ainda tiver a label UNREAD — igual ao Gmail deixa a linha em negrito.
+// Builds a conversation's listing row from the result of
+// threads.get(format:'metadata'), which already brings every message in the thread.
+// It uses the last message for subject/sender/date/snippet (it's what shows
+// as the most recent in the conversation) and counts as "unread" if ANY message
+// still has the UNREAD label — like Gmail makes the row bold.
 function mapGmailThread(threadData, account) {
   const messages = threadData.messages || [];
   const last = messages[messages.length - 1];
@@ -654,7 +654,7 @@ function mapGmailThread(threadData, account) {
     accountId: account.id,
     provider: 'google',
     accountEmail: account.email,
-    subject: getHeader('Subject') || '(sem assunto)',
+    subject: getHeader('Subject') || '(no subject)',
     from: parseAddress(getHeader('From')),
     date: last ? new Date(parseInt(last.internalDate, 10)).toISOString() : new Date(0).toISOString(),
     snippet: decodeHtmlEntities(last?.snippet || ''),
@@ -719,7 +719,7 @@ function mapMicrosoftMessage(msg, account) {
     accountId: account.id,
     provider: 'microsoft',
     accountEmail: account.email,
-    subject: msg.subject || '(sem assunto)',
+    subject: msg.subject || '(no subject)',
     from: msg.from?.emailAddress?.name
       ? `${msg.from.emailAddress.name} <${msg.from.emailAddress.address}>`
       : msg.from?.emailAddress?.address || '',
@@ -734,9 +734,9 @@ function mapMicrosoftMessage(msg, account) {
   };
 }
 
-// Equivalente ao mapGmailThread, mas para o Outlook: recebe as mensagens já
-// mapeadas (mapMicrosoftMessage) de uma mesma conversationId e agrega numa
-// única linha de listagem.
+// The mapGmailThread equivalent, but for Outlook: it gets the messages already
+// mapped (mapMicrosoftMessage) of one conversationId and aggregates them into a
+// single listing row.
 function mapMicrosoftThread(mappedMessages, conversationId, account) {
   const sorted = [...mappedMessages].sort((a, b) => new Date(a.date) - new Date(b.date));
   const last = sorted[sorted.length - 1];
@@ -746,7 +746,7 @@ function mapMicrosoftThread(mappedMessages, conversationId, account) {
     accountId: account.id,
     provider: 'microsoft',
     accountEmail: account.email,
-    subject: last?.subject || '(sem assunto)',
+    subject: last?.subject || '(no subject)',
     from: last?.from || '',
     date: last?.date || new Date(0).toISOString(),
     snippet: last?.snippet || '',
@@ -808,14 +808,14 @@ function htmlToText(html) {
     .trim();
 }
 
-// ---------------- Domínios (varredura de remetentes) ----------------
+// ---------------- Domains (sender scan) ----------------
 //
-// Ideia: não existe nenhuma API de e-mail que liste "sites onde você tem
-// cadastro" — só dá para inferir isso a partir de quem já te mandou e-mail.
-// Por isso varremos a caixa toda (não só a inbox), pegando só o remetente de
-// cada mensagem (mais leve que baixar o e-mail inteiro), e agrupamos por
-// domínio. É incremental/paginado (reaproveita os mesmos PAGE_SIZE/cursor
-// deste arquivo) porque a caixa pode ter milhares de mensagens.
+// The idea: no e-mail API lists "sites where you have an account" — it can
+// only be inferred from who has already e-mailed you. That's why we scan the
+// whole mailbox (not just the inbox), taking only each message's sender
+// (lighter than downloading the whole e-mail), and group by domain. It is
+// incremental/paged (reusing this file's PAGE_SIZE/cursor) because the
+// mailbox can have thousands of messages.
 
 async function listDomains(options = {}) {
   const { refresh = false, loadMore = false } = options;
@@ -840,7 +840,7 @@ async function listDomains(options = {}) {
       try {
         const accountWithToken = await getValidAccount(account.id);
         if (!accountWithToken) {
-          errors.push(`${account.email}: sessão expirada, reconecte a conta`);
+          errors.push(`${account.email}: session expired, reconnect the account`);
           return { senders: [], hasMore: false, scanned: 0 };
         }
         return await scanSendersForAccount(accountWithToken, { more: false });
@@ -887,9 +887,9 @@ async function loadMoreDomains() {
   return { domains, syncedAt: Date.now(), fromCache: false, errors, hasMore, scanned };
 }
 
-// Busca só o remetente (From) de cada mensagem, sem restringir por pasta —
-// isso varre a caixa toda (recebidos, arquivados etc.), que é o que interessa
-// para saber "quem já me mandou e-mail alguma vez".
+// Fetches only the sender (From) of each message, without restricting the folder —
+// this scans the whole mailbox (received, archived etc.), which is what matters
+// to know "who has ever e-mailed me".
 async function scanSendersForAccount(account, { more }) {
   const cursorKey = `${account.id}:domains-scan`;
   if (!more) pageCursors.delete(cursorKey);
@@ -946,7 +946,7 @@ async function scanSendersForAccount(account, { more }) {
   return { senders: [], hasMore: false, scanned: 0 };
 }
 
-// Agrega remetentes por domínio, mantendo contagem e primeira/última vez visto.
+// Aggregates senders by domain, keeping the count and the first/last time seen.
 function mergeDomains(existingList, newSenders) {
   const map = new Map(existingList.map((d) => [d.domain, d]));
   for (const { from, date } of newSenders) {

@@ -19,12 +19,12 @@ import { confirmDialog, automationFormDialog } from '../services/dialogs.js';
 
 const BASE_FONT_SIZE = 14;
 
-const STALE_MS = 2 * 60 * 1000; // re-sincroniza em segundo plano se o cache for mais velho que isso
+const STALE_MS = 2 * 60 * 1000; // resyncs in the background if the cache is older than this
 
-// Limite de exclusões/restaurações simultâneas. Selecionar muitos e-mails
-// (agora que dá pra fazer isso com Shift+seta) e excluir todos de uma vez
-// disparava um request por e-mail ao mesmo tempo — a API rejeitava com
-// "Too many concurrent requests for user" acima de umas poucas dezenas.
+// Limit of simultaneous deletions/restores. Selecting many e-mails
+// (now that Shift+arrow allows it) and deleting them all at once
+// fired one request per e-mail at the same time — the API rejected it with
+// "Too many concurrent requests for user" above a few dozen.
 const DELETE_CONCURRENCY = 5;
 
 async function mapWithConcurrencySettled(items, limit, fn) {
@@ -54,12 +54,12 @@ const ICONS = {
   notSpam: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8z"></path><polyline points="9 11 11 13 15 9"></polyline></svg>',
 };
 
-// Nav lateral: pastas de e-mail primeiro, telas próprias (que não listam
-// e-mails) depois. A ordem aqui é a ordem que aparece na tela.
+// Side nav: mail folders first, screens of their own (which don't list
+// e-mails) after. The order here is the order on screen.
 const NAV_ITEMS = [
   {
     folder: 'inbox',
-    label: 'Entrada',
+    label: 'Inbox',
     icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
   },
   {
@@ -69,23 +69,23 @@ const NAV_ITEMS = [
   },
   {
     folder: 'trash',
-    label: 'Lixeira',
+    label: 'Trash',
     icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
   },
   {
     folder: 'automator',
-    label: 'Automatizador',
+    label: 'Automator',
     icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
   },
   {
     folder: 'domains',
-    label: 'Domínios',
+    label: 'Domains',
     icon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
   },
 ];
 
-// Pastas que listam e-mails de verdade (paginação, seleção, atalhos de teclado).
-// "domains" e "automator" são telas próprias e ficam de fora.
+// Folders that actually list e-mails (paging, selection, keyboard shortcuts).
+// "domains" and "automator" are screens of their own and stay out.
 const EMAIL_FOLDERS = ['inbox', 'spam', 'trash'];
 
 function isEmailFolder(folder) {
@@ -99,31 +99,31 @@ export async function renderListScreen(container) {
       <div class="header-center">
       <div class="search-box">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="search-input" placeholder="Buscar por remetente, assunto ou conteúdo...">
-        <button class="search-clear" id="search-clear" title="Limpar" hidden>&times;</button>
+        <input type="text" id="search-input" placeholder="Search by sender, subject or content...">
+        <button class="search-clear" id="search-clear" title="Clear" hidden>&times;</button>
       </div>
       <div class="filter-wrap" id="filter-wrap">
-        <button class="icon-btn filter-toggle-btn" id="filter-toggle-btn" title="Filtros">
+        <button class="icon-btn filter-toggle-btn" id="filter-toggle-btn" title="Filters">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
           <span class="filter-badge" id="filter-badge" hidden></span>
         </button>
         <div class="filter-popover" id="filter-popover" hidden>
           <div class="calendar-nav">
-            <button class="icon-btn" id="cal-prev-btn" title="Mês anterior">
+            <button class="icon-btn" id="cal-prev-btn" title="Previous month">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <span class="calendar-month-label" id="calendar-month-label"></span>
-            <button class="icon-btn" id="cal-next-btn" title="Próximo mês">
+            <button class="icon-btn" id="cal-next-btn" title="Next month">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
           <div class="calendar-weekdays">
-            <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
           </div>
           <div class="calendar-grid" id="calendar-grid"></div>
           <div class="filter-popover-footer">
-            <button class="btn-link" id="filter-clear-range">Limpar período</button>
-            <button class="icon-btn sort-toggle-btn" id="sort-toggle-btn" title="Mais recentes primeiro">
+            <button class="btn-link" id="filter-clear-range">Clear period</button>
+            <button class="icon-btn sort-toggle-btn" id="sort-toggle-btn" title="Newest first">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
             </button>
           </div>
@@ -132,15 +132,15 @@ export async function renderListScreen(container) {
       </div>
       <div class="app-header-actions">
         <span class="sync-info" id="sync-info"></span>
-        <div class="zoom-control" title="Zoom do corpo do e-mail">
-          <button class="icon-btn" id="zoom-out-btn" title="Diminuir zoom (Ctrl+-)">−</button>
-          <button class="zoom-label" id="zoom-label" title="Redefinir zoom (Ctrl+0)">100%</button>
-          <button class="icon-btn" id="zoom-in-btn" title="Aumentar zoom (Ctrl+=)">+</button>
+        <div class="zoom-control" title="E-mail body zoom">
+          <button class="icon-btn" id="zoom-out-btn" title="Zoom out (Ctrl+-)">−</button>
+          <button class="zoom-label" id="zoom-label" title="Reset zoom (Ctrl+0)">100%</button>
+          <button class="icon-btn" id="zoom-in-btn" title="Zoom in (Ctrl+=)">+</button>
         </div>
-        <button class="icon-btn" id="refresh-btn" title="Sincronizar agora">
+        <button class="icon-btn" id="refresh-btn" title="Sync now">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
         </button>
-        <button class="icon-btn" id="accounts-btn" title="Contas">
+        <button class="icon-btn" id="accounts-btn" title="Accounts">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </button>
       </div>
@@ -157,17 +157,17 @@ export async function renderListScreen(container) {
       <div class="split-view">
         <div class="list-pane" id="list-pane">
           <div class="list-toolbar">
-            <input type="checkbox" id="select-all" title="Selecionar todos">
+            <input type="checkbox" id="select-all" title="Select all">
             <span class="selection-info" id="selection-info"></span>
-            <button class="btn-action-text" id="new-automation-btn" hidden>+ Nova automação</button>
-            <button class="btn-action-text" id="run-all-automations-btn" hidden>▶ Executar todas</button>
+            <button class="btn-action-text" id="new-automation-btn" hidden>+ New automation</button>
+            <button class="btn-action-text" id="run-all-automations-btn" hidden>▶ Run all</button>
             <button class="btn-action-text" id="restore-selected" hidden></button>
             <button class="btn-danger-text" id="delete-selected" hidden></button>
-            <button class="btn-danger-text" id="empty-trash-btn" hidden>Esvaziar lixeira</button>
+            <button class="btn-danger-text" id="empty-trash-btn" hidden>Empty trash</button>
           </div>
           <div class="sync-errors" id="sync-errors" hidden></div>
           <div id="email-list" class="email-list">
-            <div class="loading-state"><div class="spinner"></div>Carregando e-mails...</div>
+            <div class="loading-state"><div class="spinner"></div>Loading e-mails...</div>
           </div>
         </div>
         <div class="split-divider" id="split-divider"></div>
@@ -212,44 +212,44 @@ export async function renderListScreen(container) {
   let emails = [];
   let folder = 'inbox';
   let query = '';
-  let dateFrom = ''; // 'YYYY-MM-DD' ou '' (sem limite inferior)
-  let dateTo = ''; // 'YYYY-MM-DD' ou '' (sem limite superior)
-  let sortOrder = 'desc'; // 'desc' = mais recentes primeiro (padrão); 'asc' = mais antigos primeiro
+  let dateFrom = ''; // 'YYYY-MM-DD' or '' (no lower bound)
+  let dateTo = ''; // 'YYYY-MM-DD' or '' (no upper bound)
+  let sortOrder = 'desc'; // 'desc' = newest first (default); 'asc' = oldest first
   let filterPopoverOpen = false;
-  let calendarViewDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); // mês exibido no popover
-  let rangeStart = null; // seleção em andamento no calendário (Date), só vira dateFrom/dateTo ao fechar o intervalo
+  let calendarViewDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); // month shown in the popover
+  let rangeStart = null; // selection in progress on the calendar (Date); it only becomes dateFrom/dateTo once the range closes
   let rangeEnd = null;
-  let hoverDate = null; // dia sob o mouse, pra pré-visualizar o intervalo antes de fechar
-  // Criado cedo (não só na seção "Atalhos de teclado") porque o popover de
-  // filtros também precisa dele pra fechar ao clicar fora, antes daquela seção.
+  let hoverDate = null; // day under the mouse, to preview the range before closing it
+  // Created early (not only in the "Keyboard shortcuts" section) because the
+  // filter popover also needs it to close on an outside click, before that section.
   const keyboardController = new AbortController();
   let openId = null;
   let syncing = false;
   let hasMore = true;
   let loadingMore = false;
-  let total = null; // total real da pasta no servidor (null até a 1ª resposta chegar)
-  let focusId = null; // linha "em foco" pelo teclado (independente de qual está aberta na leitura)
-  let selectionAnchorId = null; // ponto de partida (fixo) da sessão de seleção por Shift+seta
-  let selectionSessionLow = null; // menor índice já alcançado nesta sessão
-  let selectionSessionHigh = null; // maior índice já alcançado nesta sessão
-  let bodyZoom = 1; // zoom do corpo do e-mail, persistido e aplicado a todos
-  let openBodyHosts = []; // { frame, pre } de cada mensagem já renderizada na conversa aberta (zoom se aplica a todas)
-  let mutatingInFlight = false; // trava excluir/restaurar simultâneos (segurar Delete repetia rápido demais e a API rejeitava com "too many concurrent requests")
+  let total = null; // the folder's real total on the server (null until the 1st answer arrives)
+  let focusId = null; // row "in focus" by keyboard (independent of which one is open for reading)
+  let selectionAnchorId = null; // the (fixed) starting point of the Shift+arrow selection session
+  let selectionSessionLow = null; // lowest index reached in this session
+  let selectionSessionHigh = null; // highest index reached in this session
+  let bodyZoom = 1; // e-mail body zoom, persisted and applied to all
+  let openBodyHosts = []; // { frame, pre } of each message already rendered in the open conversation (zoom applies to all)
+  let mutatingInFlight = false; // locks simultaneous delete/restore (holding Delete repeated too fast and the API rejected it with "too many concurrent requests")
   const selectedIds = new Set();
 
-  // --- Aba "Domínios" (modo à parte, não é uma lista de e-mails) ---
+  // --- "Domains" tab (a mode of its own, not an e-mail list) ---
   let domains = [];
-  let domainsQuery = ''; // filtro local — os domínios já escaneados ficam todos na memória
+  let domainsQuery = ''; // local filter — the scanned domains all stay in memory
   let domainsHasMore = true;
   let domainsLoadingMore = false;
   let domainsSyncing = false;
   let domainsScanned = 0;
   let selectedDomain = null;
 
-  // --- Aba "Automatizador" (regras de limpeza salvas) ---
+  // --- "Automator" tab (saved cleanup rules) ---
   let automationRules = [];
-  let automationQuery = ''; // filtro local por nome/remetente
-  let running = false; // trava reentrância enquanto alguma execução está em andamento
+  let automationQuery = ''; // local filter by name/sender
+  let running = false; // blocks re-entry while some run is in progress
 
   clearReadingPane();
 
@@ -267,10 +267,10 @@ export async function renderListScreen(container) {
     }
   }
 
-  // A busca agora é feita no servidor (Gmail/Graph) — `emails` já vem filtrado
-  // pela query quando houver uma; esta função existe só para manter os vários
-  // pontos do código que operam sobre "a lista que está na tela" desacoplados
-  // de como ela foi obtida.
+  // Search is now done on the server (Gmail/Graph) — `emails` already comes filtered
+  // by the query when there is one; this function only exists to keep the many
+  // places in the code that work on "the list on screen" decoupled
+  // from how it was obtained.
   function filteredEmails() {
     return emails;
   }
@@ -280,21 +280,21 @@ export async function renderListScreen(container) {
 
     if (emails.length === 0) {
       const emptyByFolder = {
-        trash: 'A lixeira está vazia.',
-        spam: 'Nenhum e-mail marcado como spam.',
+        trash: 'The trash is empty.',
+        spam: 'No e-mails marked as spam.',
       };
       const emptyMsg = query
-        ? `Nada encontrado para "${escapeHtml(query)}".`
-        : (emptyByFolder[folder] || 'Nenhum e-mail encontrado.');
+        ? `Nothing found for "${escapeHtml(query)}".`
+        : (emptyByFolder[folder] || 'No e-mails found.');
       listEl.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
       updateToolbar();
       return;
     }
 
     const rowActionIcon = folder === 'trash' ? ICONS.restore : ICONS.trash;
-    const rowActionTitle = folder === 'trash' ? 'Restaurar para a caixa de entrada' : 'Mover para a lixeira';
-    // No spam a linha tem duas ações: tirar do spam ("não é spam") ou mandar
-    // direto pra lixeira.
+    const rowActionTitle = folder === 'trash' ? 'Restore to the inbox' : 'Move to the trash';
+    // In spam the row has two actions: take it out of spam ("not spam") or send
+    // it straight to the trash.
     const showRowRestore = folder === 'spam';
 
     const rows = filtered.map((email) => `
@@ -311,19 +311,19 @@ export async function renderListScreen(container) {
           </div>
         </div>
         <div class="email-row-actions">
-          ${showRowRestore ? `<button class="icon-btn row-restore" data-id="${escapeHtml(email.id)}" title="Não é spam — mover para a caixa de entrada">${ICONS.notSpam}</button>` : ''}
+          ${showRowRestore ? `<button class="icon-btn row-restore" data-id="${escapeHtml(email.id)}" title="Not spam — move to the inbox">${ICONS.notSpam}</button>` : ''}
           <button class="icon-btn row-action" data-id="${escapeHtml(email.id)}" title="${rowActionTitle}">${rowActionIcon}</button>
         </div>
       </div>
     `).join('');
 
-    // Rolagem infinita paginando de 50 em 50 — vale tanto na listagem normal
-    // quanto durante uma busca (que agora também é paginada no servidor).
+    // Infinite scroll paging 50 at a time — it applies both to the normal listing
+    // and during a search (which is now paged on the server too).
     let pagingRow = '';
     if (loadingMore) {
       pagingRow = '<div class="load-more-row"><div class="spinner spinner-small"></div></div>';
     } else if (!hasMore) {
-      pagingRow = `<div class="load-more-row load-more-end">${query ? 'Não há mais resultados' : 'Não há mais e-mails'}</div>`;
+      pagingRow = `<div class="load-more-row load-more-end">${query ? 'No more results' : 'No more e-mails'}</div>`;
     }
 
     listEl.innerHTML = rows + pagingRow;
@@ -364,7 +364,7 @@ export async function renderListScreen(container) {
 
   function updateToolbar() {
     const filtered = filteredEmails();
-    // Mantém a seleção coerente com o que existe na lista
+    // Keeps the selection consistent with what exists in the list
     const validIds = new Set(emails.map((e) => e.id));
     for (const id of selectedIds) {
       if (!validIds.has(id)) selectedIds.delete(id);
@@ -380,28 +380,28 @@ export async function renderListScreen(container) {
     selectAllEl.checked = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
     selectAllEl.indeterminate = count > 0 && !selectAllEl.checked;
 
-    // Sempre no formato "X de Y", buscando ou não — só muda a palavra.
-    const unit = query ? 'resultado' : 'e-mail';
+    // Always in the "X of Y" form, searching or not — only the word changes.
+    const unit = query ? 'result' : 'e-mail';
     if (count > 0) {
-      selectionInfo.textContent = `${count} selecionado${count > 1 ? 's' : ''}`;
+      selectionInfo.textContent = `${count} selected`;
     } else if (total != null) {
-      selectionInfo.textContent = `${emails.length} de ${total} ${unit}${total !== 1 ? 's' : ''}`;
+      selectionInfo.textContent = `${emails.length} of ${total} ${unit}${total !== 1 ? 's' : ''}`;
     } else {
       selectionInfo.textContent = `${emails.length} ${unit}${emails.length !== 1 ? 's' : ''}`;
     }
 
     restoreSelectedBtn.hidden = count === 0 || (folder !== 'trash' && folder !== 'spam');
-    restoreSelectedBtn.textContent = folder === 'spam' ? `Não é spam (${count})` : `Restaurar (${count})`;
+    restoreSelectedBtn.textContent = folder === 'spam' ? `Not spam (${count})` : `Restore (${count})`;
     deleteSelectedBtn.hidden = count === 0;
-    deleteSelectedBtn.textContent = folder === 'trash' ? `Excluir de vez (${count})` : `Excluir (${count})`;
-    // Independe de seleção — esvazia a lixeira toda, não só o que está marcado.
+    deleteSelectedBtn.textContent = folder === 'trash' ? `Delete forever (${count})` : `Delete (${count})`;
+    // Independent of the selection — it empties the whole trash, not only what is checked.
     emptyTrashBtn.hidden = folder !== 'trash' || emails.length === 0;
   }
 
   function updateSyncInfo(syncedAt) {
     if (!syncedAt) return;
-    const time = new Date(syncedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    syncInfoEl.textContent = `Sincronizado às ${time}`;
+    const time = new Date(syncedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    syncInfoEl.textContent = `Synced at ${time}`;
   }
 
   function showSyncErrors(errors) {
@@ -413,14 +413,14 @@ export async function renderListScreen(container) {
     }
   }
 
-  // Atualiza destaque/foco da linha na hora (sem custo de rede) — separado da
-  // busca/renderização do corpo, que pode ser adiada (ver scheduleOpenEmail).
+  // Updates the row highlight/focus at once (no network cost) — separate from
+  // fetching/rendering the body, which can be deferred (see scheduleOpenEmail).
   function focusEmailRow(emailId, { resetSelection = true } = {}) {
     openId = emailId;
     focusId = emailId;
-    // Abrir um e-mail por clique/seta normal encerra uma seleção por faixa em
-    // andamento; já o Shift+seta chama isto com resetSelection:false, pois
-    // ele mesmo continua controlando a âncora entre um aperto e o seguinte.
+    // Opening an e-mail by a normal click/arrow ends a range selection in
+    // progress; Shift+arrow calls this with resetSelection:false, since it keeps
+    // controlling the anchor itself between one press and the next.
     if (resetSelection) {
       selectionAnchorId = null;
       selectionSessionLow = null;
@@ -435,11 +435,11 @@ export async function renderListScreen(container) {
   const READ_DEBOUNCE_MS = 1500;
   let openEmailDebounceTimer = null;
 
-  // Usado pela navegação por teclado (seta/Shift+seta): move o destaque na
-  // hora, mas só busca e renderiza o corpo se o usuário ficar parado nessa
-  // linha por READ_DEBOUNCE_MS — evita um request por linha ao segurar a
-  // tecla e passar rápido por várias (o que gerava erro de "muitos requests
-  // simultâneos" na API e um monte de carregamento inútil no painel).
+  // Used by keyboard navigation (arrow/Shift+arrow): moves the highlight at
+  // once, but only fetches and renders the body if the user stays on that
+  // row for READ_DEBOUNCE_MS — avoids one request per row when holding the
+  // key and passing quickly over several (which caused "too many concurrent
+  // requests" API errors and a lot of useless loading in the pane).
   function scheduleOpenEmail(emailId, options) {
     focusEmailRow(emailId, options);
     clearTimeout(openEmailDebounceTimer);
@@ -450,30 +450,30 @@ export async function renderListScreen(container) {
 
   async function openEmail(emailId, { resetSelection = true, skipFocus = false } = {}) {
     if (!skipFocus) focusEmailRow(emailId, { resetSelection });
-    clearTimeout(openEmailDebounceTimer); // uma abertura de verdade cancela qualquer debounce pendente
+    clearTimeout(openEmailDebounceTimer); // a real open cancels any pending debounce
 
-    readingPane.innerHTML = '<div class="loading-state"><div class="spinner"></div>Carregando e-mail...</div>';
+    readingPane.innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading e-mail...</div>';
 
     try {
       const email = await getEmail(emailId);
-      if (openId !== emailId) return; // usuário já clicou em outro
+      if (openId !== emailId) return; // the user already clicked another one
 
       const deleteButton = folder === 'trash'
-        ? `<button class="icon-btn" id="reading-delete" title="Excluir definitivamente">${ICONS.trash}</button>`
-        : `<button class="icon-btn" id="reading-delete" title="Mover para a lixeira">${ICONS.trash}</button>`;
+        ? `<button class="icon-btn" id="reading-delete" title="Delete permanently">${ICONS.trash}</button>`
+        : `<button class="icon-btn" id="reading-delete" title="Move to the trash">${ICONS.trash}</button>`;
       const restoreButton = folder === 'trash'
-        ? `<button class="icon-btn" id="reading-restore" title="Restaurar para a caixa de entrada">${ICONS.restore}</button>`
+        ? `<button class="icon-btn" id="reading-restore" title="Restore to the inbox">${ICONS.restore}</button>`
         : folder === 'spam'
-          ? `<button class="icon-btn" id="reading-restore" title="Não é spam — mover para a caixa de entrada">${ICONS.notSpam}</button>`
+          ? `<button class="icon-btn" id="reading-restore" title="Not spam — move to the inbox">${ICONS.notSpam}</button>`
           : '';
       const actions = restoreButton + deleteButton;
 
       const messages = email.messages || [];
       const lastIndex = messages.length - 1;
 
-      // Conversa inteira empilhada numa mensagem só, igual ao Gmail: a mais
-      // recente já vem aberta, as anteriores ficam colapsadas (só remetente +
-      // trecho + data) e expandem ao clicar.
+      // The whole conversation stacked in a single message, like Gmail: the most
+      // recent comes open, the earlier ones stay collapsed (just sender + snippet
+      // + date) and expand on click.
       const messagesHtml = messages.map((msg, index) => `
         <div class="thread-message ${index === lastIndex ? 'expanded' : ''}" data-index="${index}">
           <div class="thread-message-summary">
@@ -483,9 +483,9 @@ export async function renderListScreen(container) {
           </div>
           <div class="thread-message-detail">
             <div class="detail-row"><strong>De:</strong> ${escapeHtml(msg.from)}</div>
-            <div class="detail-row"><strong>Para:</strong> ${escapeHtml((msg.to || []).join(', '))}</div>
-            <div class="detail-row"><strong>Data:</strong> ${formatDateFull(msg.date)}</div>
-            ${msg.attachments?.length ? `<div class="attachments"><strong>Anexos:</strong> ${escapeHtml(msg.attachments.join(', '))}</div>` : ''}
+            <div class="detail-row"><strong>To:</strong> ${escapeHtml((msg.to || []).join(', '))}</div>
+            <div class="detail-row"><strong>Date:</strong> ${formatDateFull(msg.date)}</div>
+            ${msg.attachments?.length ? `<div class="attachments"><strong>Attachments:</strong> ${escapeHtml(msg.attachments.join(', '))}</div>` : ''}
             <div class="thread-message-body-host"></div>
           </div>
         </div>
@@ -497,7 +497,7 @@ export async function renderListScreen(container) {
             <div class="email-meta">
               <span class="provider-badge ${email.provider}">${email.provider === 'google' ? 'Gmail' : 'Outlook'}</span>
               <span class="account-email">${escapeHtml(email.accountEmail)}</span>
-              ${messages.length > 1 ? `<span class="thread-count">${messages.length} mensagens</span>` : ''}
+              ${messages.length > 1 ? `<span class="thread-count">${messages.length} messages</span>` : ''}
             </div>
             <div class="reading-actions">${actions}</div>
           </div>
@@ -556,7 +556,7 @@ export async function renderListScreen(container) {
       if (openId !== emailId) return;
       readingPane.innerHTML = `
         <div class="empty-state">
-          <p>Erro ao carregar e-mail:<br>${escapeHtml(err.message || 'Erro desconhecido')}</p>
+          <p>Error loading the e-mail:<br>${escapeHtml(err.message || 'Unknown error')}</p>
         </div>
       `;
     }
@@ -571,16 +571,16 @@ export async function renderListScreen(container) {
       readingPane.innerHTML = `
         <div class="empty-state reading-empty">
           ${ICONS.bolt}
-          <p>O progresso das execuções aparece aqui</p>
+          <p>Run progress shows up here</p>
           <div class="automation-empty-hint">
-            Cada automação guarda um ou mais remetentes separados por ";" (ex.:
-            "santander;btgpactual;kabum") e move para a lixeira tudo que
-            <strong>veio</strong> deles — citar o nome no assunto ou no corpo
-            não conta. O e-mail de quem enviou é quebrado em "@", ".", "_", "-"
-            e o pedaço tem que ser igual ao que você digitou: "btgpactual" pega
-            @e.btgpactual.com.br e btgpactual@gmail.com, mas "btg" não pega
-            nada. Use ⚡ para rodar uma, ou "Executar todas" para rodar todas as
-            ativadas — o interruptor de cada linha decide quem entra.
+            Each automation holds one or more senders separated by ";" (e.g.
+            "acmebank;shopco;newsletter") and moves to the trash everything that
+            <strong>came</strong> from them — mentioning the name in the subject or
+            body doesn't count. The sender's address is split on "@", ".", "_", "-"
+            and the piece has to equal what you typed: "acmebank" catches
+            @e.acmebank.com and acmebank@gmail.com, but "acme" catches nothing.
+            Use ⚡ to run one, or "Run all" to run every enabled one — each
+            row's switch decides which ones go in.
           </div>
         </div>
       `;
@@ -591,7 +591,7 @@ export async function renderListScreen(container) {
       readingPane.innerHTML = `
         <div class="empty-state reading-empty">
           ${ICONS.mail}
-          <p>Selecione um domínio para ver detalhes</p>
+          <p>Select a domain to see its details</p>
         </div>
       `;
       return;
@@ -600,11 +600,11 @@ export async function renderListScreen(container) {
     readingPane.innerHTML = `
       <div class="empty-state reading-empty">
         ${ICONS.mail}
-        <p>Selecione um e-mail para ler</p>
+        <p>Select an e-mail to read</p>
         <div class="reading-empty-shortcuts">
-          <div><kbd>↑</kbd><kbd>↓</kbd> navegar</div>
-          <div><kbd>Shift</kbd> + <kbd>↑</kbd><kbd>↓</kbd> selecionar vários</div>
-          <div><kbd>Delete</kbd> excluir</div>
+          <div><kbd>↑</kbd><kbd>↓</kbd> navigate</div>
+          <div><kbd>Shift</kbd> + <kbd>↑</kbd><kbd>↓</kbd> select several</div>
+          <div><kbd>Delete</kbd> delete</div>
         </div>
       </div>
     `;
@@ -614,25 +614,25 @@ export async function renderListScreen(container) {
     const gone = new Set(ids);
     const removedCount = emails.filter((e) => gone.has(e.id)).length;
     emails = emails.filter((e) => !gone.has(e.id));
-    // Ajuste otimista (o loadMore() logo abaixo, se rodar, corrige para o valor real do servidor).
+    // Optimistic adjustment (the loadMore() just below, if it runs, fixes it to the server's real value).
     if (total != null) total = Math.max(0, total - removedCount);
     for (const id of gone) selectedIds.delete(id);
     if (openId && gone.has(openId)) clearReadingPane();
     renderList();
     if (failed.length > 0) {
-      showSyncErrors([`${failed.length} e-mail(s) com erro: ${failed[0].reason?.message || ''}`]);
+      showSyncErrors([`${failed.length} e-mail(s) failed: ${failed[0].reason?.message || ''}`]);
     }
-    // Repõe e-mails removidos da lista, trazendo mais do servidor se houver
-    // (de quebra, corrige o total exibido para o valor real do servidor).
+    // Refills e-mails removed from the list, bringing more from the server if there are any
+    // (and, on the way, fixes the displayed total to the server's real value).
     if (gone.size > 0 && hasMore) {
       loadMore();
     }
   }
 
   async function removeEmails(ids, { permanent }, nextId = null) {
-    // Ignora chamadas repetidas enquanto uma exclusão já está em andamento —
-    // segurar Delete faz o teclado repetir bem mais rápido do que a API
-    // aguenta em paralelo, e isso já causou erro de "muitos requests simultâneos".
+    // Ignores repeated calls while a deletion is already in progress —
+    // holding Delete makes the keyboard repeat much faster than the API
+    // handles in parallel, and that has already caused "too many concurrent requests" errors.
     if (mutatingInFlight) return;
     mutatingInFlight = true;
     try {
@@ -653,7 +653,7 @@ export async function renderListScreen(container) {
   }
 
   function handleKeyboardShortcuts(e) {
-    if (folder === 'domains' || folder === 'automator') return; // atalhos de e-mail não se aplicam a essas telas
+    if (folder === 'domains' || folder === 'automator') return; // e-mail shortcuts don't apply to these screens
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -679,12 +679,12 @@ export async function renderListScreen(container) {
       let index = filtered.findIndex((email) => email.id === currentId);
 
       if (e.shiftKey) {
-        // Shift+seta abre uma "janela" de seleção a partir de uma âncora fixa
-        // nesta sessão (até soltar o Shift e mexer sem ele). Tudo que a janela
-        // já alcançou (selectionSessionLow..High) fica sob controle dela: quem
-        // está dentro da janela atual fica marcado, quem ficou pra fora é
-        // desmarcado — mesmo que já estivesse marcado por uma sessão anterior.
-        // O que esta sessão nunca tocou mantém o que já estava selecionado.
+        // Shift+arrow opens a selection "window" from an anchor fixed
+        // for this session (until Shift is released and you move without it). Everything
+        // the window has already reached (selectionSessionLow..High) is under its control:
+        // whatever is inside the current window gets checked, whatever fell outside is
+        // unchecked — even if it had been checked by an earlier session.
+        // What this session never touched keeps whatever was already selected.
         if (index === -1) {
           index = delta > 0 ? 0 : filtered.length - 1;
           selectionAnchorId = filtered[index].id;
@@ -705,9 +705,9 @@ export async function renderListScreen(container) {
         focusId = filtered[index].id;
         applyRangeSelection(selectionAnchorId, focusId, filtered, selectionSessionLow, selectionSessionHigh);
         scrollEmailIntoView(focusId);
-        // Também abre no painel de leitura, igual a navegação normal — só não
-        // reseta a âncora, pra dar pra continuar estendendo a faixa depois.
-        // Debounced: segurar Shift+seta não deve buscar um e-mail por linha.
+        // It also opens in the reading pane, like normal navigation — it just doesn't
+        // reset the anchor, so the range can keep being extended afterwards.
+        // Debounced: holding Shift+arrow must not fetch one e-mail per row.
         scheduleOpenEmail(focusId, { resetSelection: false });
         renderList();
         return;
@@ -718,19 +718,19 @@ export async function renderListScreen(container) {
         : Math.min(Math.max(index + delta, 0), filtered.length - 1);
 
       if (nextIndex !== index || !openId) {
-        // Debounced: segurar a seta não deve disparar um request por linha.
+        // Debounced: holding the arrow must not fire one request per row.
         scheduleOpenEmail(filtered[nextIndex].id);
         scrollEmailIntoView(filtered[nextIndex].id);
       }
     }
   }
 
-  // Aplica a janela de seleção desta sessão de Shift+seta. Linhas dentro da
-  // janela atual (entre a âncora e o foco) ficam marcadas; linhas que a sessão
-  // já alcançou antes (sessionLow..sessionHigh) mas que ficaram de fora da
-  // janela atual são desmarcadas — mesmo que estivessem marcadas de antes.
-  // Linhas fora do alcance desta sessão não são tocadas (preserva outras
-  // seleções feitas antes desta sessão começar).
+  // Applies this Shift+arrow session's selection window. Rows inside the
+  // current window (between the anchor and the focus) get checked; rows the session
+  // reached before (sessionLow..sessionHigh) but that fell outside the
+  // current window get unchecked — even if they were checked before.
+  // Rows outside this session's reach aren't touched (it keeps other
+  // selections made before this session started).
   function applyRangeSelection(anchorId, focusIdValue, filtered, sessionLow, sessionHigh) {
     const anchorIndex = filtered.findIndex((email) => email.id === anchorId);
     const focusIndex = filtered.findIndex((email) => email.id === focusIdValue);
@@ -759,9 +759,9 @@ export async function renderListScreen(container) {
     }
   }
 
-  // Um filtro (busca, período ou ordem) muda o que está sendo pedido ao
-  // servidor — se ele mudar enquanto uma resposta ainda está a caminho, essa
-  // resposta ficou obsoleta e não deve ser aplicada.
+  // A filter (search, period or order) changes what is being asked of the
+  // server — if it changes while an answer is still on its way, that
+  // answer is stale and must not be applied.
   function currentRequestSignature() {
     return `${folder}:${query}:${dateFrom}:${dateTo}:${sortOrder}`;
   }
@@ -782,7 +782,7 @@ export async function renderListScreen(container) {
       }
     } catch (err) {
       if (currentRequestSignature() === requestedSignature) {
-        showSyncErrors([err.message || 'Erro ao carregar mais e-mails']);
+        showSyncErrors([err.message || 'Error loading more e-mails']);
       }
     } finally {
       loadingMore = false;
@@ -798,7 +798,7 @@ export async function renderListScreen(container) {
 
     try {
       const result = await listEmails({ refresh, folder, query, dateFrom, dateTo, sortOrder });
-      if (currentRequestSignature() !== requestedSignature) return; // mudou de aba/busca/filtro durante o request
+      if (currentRequestSignature() !== requestedSignature) return; // changed tab/search/filter during the request
       emails = result.emails;
       hasMore = result.hasMore;
       total = result.total;
@@ -806,8 +806,8 @@ export async function renderListScreen(container) {
       showSyncErrors(result.errors);
       renderList();
 
-      // Cache velho? Atualiza em segundo plano sem travar a tela (só se aplica
-      // fora de uma busca, que nunca usa o cache).
+      // Stale cache? Refreshes in the background without freezing the screen (only
+      // outside a search, which never uses the cache).
       if (result.fromCache && Date.now() - result.syncedAt > STALE_MS) {
         syncing = false;
         refreshBtn.classList.remove('spinning');
@@ -816,20 +816,20 @@ export async function renderListScreen(container) {
     } catch (err) {
       if (currentRequestSignature() !== requestedSignature) return;
       if (emails.length === 0) {
-        const needsReconnect = /reconecte|autorização revogada|sessão expirada|token de atualização/i.test(err.message || '');
+        const needsReconnect = /reconnect|authorization revoked|session expired|refresh token/i.test(err.message || '');
         listEl.innerHTML = `
           <div class="empty-state">
-            <p>Erro ao ${query ? 'buscar' : 'carregar'} e-mails:<br>${escapeHtml(err.message || 'Erro desconhecido')}</p>
+            <p>Error ${query ? 'searching' : 'loading'} e-mails:<br>${escapeHtml(err.message || 'Unknown error')}</p>
             <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
-              <button class="btn btn-primary" id="retry-btn">Tentar novamente</button>
-              ${needsReconnect ? `<button class="btn" id="manage-accounts-btn">Gerenciar contas</button>` : ''}
+              <button class="btn btn-primary" id="retry-btn">Try again</button>
+              ${needsReconnect ? `<button class="btn" id="manage-accounts-btn">Manage accounts</button>` : ''}
             </div>
           </div>
         `;
         listEl.querySelector('#retry-btn')?.addEventListener('click', () => sync({ refresh: true }));
         listEl.querySelector('#manage-accounts-btn')?.addEventListener('click', () => navigate('login'));
       } else {
-        showSyncErrors([err.message || 'Erro ao sincronizar']);
+        showSyncErrors([err.message || 'Error syncing']);
       }
     } finally {
       syncing = false;
@@ -837,11 +837,11 @@ export async function renderListScreen(container) {
     }
   }
 
-  // Reinicia a listagem do zero — usado ao trocar de pasta e ao mudar a busca,
-  // já que os dois mudam o que deve ser buscado no servidor.
+  // Restarts the listing from scratch — used when switching folders and changing the search,
+  // since both change what must be fetched from the server.
   function restartListing() {
     emails = [];
-    hasMore = true; // otimista; sync() ajusta para o valor real
+    hasMore = true; // optimistic; sync() adjusts it to the real value
     total = null;
     loadingMore = false;
     selectedIds.clear();
@@ -849,16 +849,16 @@ export async function renderListScreen(container) {
     selectionSessionLow = null;
     selectionSessionHigh = null;
     clearReadingPane();
-    listEl.innerHTML = `<div class="loading-state"><div class="spinner"></div>${query ? 'Buscando...' : 'Carregando e-mails...'}</div>`;
+    listEl.innerHTML = `<div class="loading-state"><div class="spinner"></div>${query ? 'Searching...' : 'Loading e-mails...'}</div>`;
     sync({ refresh: false });
   }
 
-  // presetQuery é usado pelo botão "Ver e-mails desse remetente" da tela de
-  // Domínios: troca pra Caixa de entrada já com a busca preenchida, num só passo.
+  // presetQuery is used by the "See e-mails from this sender" button on the
+  // Domains screen: switches to the Inbox with the search already filled in, in one step.
   function switchFolder(next, { presetQuery = null } = {}) {
     if (next === folder && presetQuery == null) return;
-    // Domínios e Automatizador têm filtros locais próprios, separados da busca
-    // de e-mails — ao entrar ou sair de qualquer um deles, começamos do zero.
+    // Domains and Automator have local filters of their own, separate from the
+    // e-mail search — on entering or leaving either of them, we start from scratch.
     const enteringSpecial = !isEmailFolder(next);
     const leavingSpecial = !isEmailFolder(folder);
     folder = next;
@@ -877,13 +877,13 @@ export async function renderListScreen(container) {
     }
 
     selectedIds.clear();
-    // Botões que só fazem sentido fora das telas especiais.
+    // Buttons that only make sense outside the special screens.
     newAutomationBtn.hidden = true;
     runAllAutomationsBtn.hidden = true;
     clearReadingPane();
 
     if (folder === 'domains') {
-      searchInput.placeholder = 'Filtrar domínios já carregados...';
+      searchInput.placeholder = 'Filter the loaded domains...';
       selectAllEl.hidden = true;
       restoreSelectedBtn.hidden = true;
       deleteSelectedBtn.hidden = true;
@@ -892,7 +892,7 @@ export async function renderListScreen(container) {
       closeFilterPopover();
       startDomainsView();
     } else if (folder === 'automator') {
-      searchInput.placeholder = 'Filtrar automações...';
+      searchInput.placeholder = 'Filter automations...';
       selectAllEl.hidden = true;
       restoreSelectedBtn.hidden = true;
       deleteSelectedBtn.hidden = true;
@@ -902,19 +902,19 @@ export async function renderListScreen(container) {
       closeFilterPopover();
       startAutomatorView();
     } else {
-      // A busca é sempre dentro da pasta aberta — o placeholder deixa isso claro.
+      // The search is always within the open folder — the placeholder makes that clear.
       const placeholderByFolder = {
-        trash: 'Buscar na lixeira...',
-        spam: 'Buscar no spam...',
+        trash: 'Search the trash...',
+        spam: 'Search spam...',
       };
-      searchInput.placeholder = placeholderByFolder[folder] || 'Buscar por remetente, assunto ou conteúdo...';
+      searchInput.placeholder = placeholderByFolder[folder] || 'Search by sender, subject or content...';
       selectAllEl.hidden = false;
       filterWrapEl.hidden = false;
       restartListing();
     }
   }
 
-  // --- Domínios: quem já me mandou e-mail (proxy de "onde tenho cadastro") ---
+  // --- Domains: who has e-mailed me (a proxy for "where I have an account") ---
 
   function filteredDomains() {
     if (!domainsQuery) return domains;
@@ -926,13 +926,13 @@ export async function renderListScreen(container) {
     const filtered = filteredDomains();
 
     if (domains.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">Nenhum domínio encontrado ainda.</div>';
+      listEl.innerHTML = '<div class="empty-state">No domains found yet.</div>';
       updateDomainsToolbar();
       return;
     }
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<div class="empty-state">Nada encontrado para "${escapeHtml(domainsQuery)}".</div>`;
+      listEl.innerHTML = `<div class="empty-state">Nothing found for "${escapeHtml(domainsQuery)}".</div>`;
       updateDomainsToolbar();
       return;
     }
@@ -944,7 +944,7 @@ export async function renderListScreen(container) {
             <span class="domain-row-name">${escapeHtml(d.name)}</span>
             <span class="domain-row-count">${d.count}</span>
           </div>
-          <div class="domain-row-line2">${escapeHtml(d.domain)} · última vez ${formatDateCompact(d.lastSeen)}</div>
+          <div class="domain-row-line2">${escapeHtml(d.domain)} · last seen ${formatDateCompact(d.lastSeen)}</div>
         </div>
       </div>
     `).join('');
@@ -953,7 +953,7 @@ export async function renderListScreen(container) {
     if (domainsLoadingMore) {
       pagingRow = '<div class="load-more-row"><div class="spinner spinner-small"></div></div>';
     } else if (!domainsHasMore) {
-      pagingRow = '<div class="load-more-row load-more-end">Toda a caixa já foi escaneada</div>';
+      pagingRow = '<div class="load-more-row load-more-end">The whole mailbox has been scanned</div>';
     }
 
     listEl.innerHTML = rows + pagingRow;
@@ -968,8 +968,8 @@ export async function renderListScreen(container) {
   function updateDomainsToolbar() {
     const filtered = filteredDomains();
     selectionInfo.textContent = domainsQuery
-      ? `${filtered.length} de ${domains.length} domínios`
-      : `${domains.length} domínio${domains.length !== 1 ? 's' : ''} · ${domainsScanned} e-mail${domainsScanned !== 1 ? 's' : ''} escaneado${domainsScanned !== 1 ? 's' : ''}`;
+      ? `${filtered.length} of ${domains.length} domains`
+      : `${domains.length} domain${domains.length !== 1 ? 's' : ''} · ${domainsScanned} e-mail${domainsScanned !== 1 ? 's' : ''} scanned`;
   }
 
   function openDomain(domain) {
@@ -984,12 +984,12 @@ export async function renderListScreen(container) {
     readingPane.innerHTML = `
       <div class="reading-header">
         <h2>${escapeHtml(info.name)}</h2>
-        <div class="detail-row"><strong>Domínio:</strong> ${escapeHtml(info.domain)}</div>
-        <div class="detail-row"><strong>E-mails recebidos:</strong> ${info.count}</div>
-        <div class="detail-row"><strong>Primeiro contato:</strong> ${formatDateFull(info.firstSeen)}</div>
-        <div class="detail-row"><strong>Último contato:</strong> ${formatDateFull(info.lastSeen)}</div>
+        <div class="detail-row"><strong>Domain:</strong> ${escapeHtml(info.domain)}</div>
+        <div class="detail-row"><strong>E-mails received:</strong> ${info.count}</div>
+        <div class="detail-row"><strong>First contact:</strong> ${formatDateFull(info.firstSeen)}</div>
+        <div class="detail-row"><strong>Last contact:</strong> ${formatDateFull(info.lastSeen)}</div>
       </div>
-      <button class="btn btn-primary" id="see-domain-emails-btn" style="margin-top: 16px;">Ver e-mails desse remetente</button>
+      <button class="btn btn-primary" id="see-domain-emails-btn" style="margin-top: 16px;">See e-mails from this sender</button>
     `;
 
     readingPane.querySelector('#see-domain-emails-btn').addEventListener('click', () => {
@@ -1003,7 +1003,7 @@ export async function renderListScreen(container) {
     domainsLoadingMore = false;
     domainsScanned = 0;
     selectedDomain = null;
-    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Escaneando e-mails...</div>';
+    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Scanning e-mails...</div>';
     await loadDomains({ refresh: false });
   }
 
@@ -1014,7 +1014,7 @@ export async function renderListScreen(container) {
 
     try {
       const result = await listDomains({ refresh });
-      if (folder !== 'domains') return; // usuário trocou de aba durante o request
+      if (folder !== 'domains') return; // the user switched tabs during the request
       domains = result.domains;
       domainsHasMore = result.hasMore;
       domainsScanned = result.scanned;
@@ -1026,13 +1026,13 @@ export async function renderListScreen(container) {
       if (domains.length === 0) {
         listEl.innerHTML = `
           <div class="empty-state">
-            <p>Erro ao escanear e-mails:<br>${escapeHtml(err.message || 'Erro desconhecido')}</p>
-            <button class="btn btn-primary" id="retry-btn" style="margin-top: 16px;">Tentar novamente</button>
+            <p>Error scanning e-mails:<br>${escapeHtml(err.message || 'Unknown error')}</p>
+            <button class="btn btn-primary" id="retry-btn" style="margin-top: 16px;">Try again</button>
           </div>
         `;
         listEl.querySelector('#retry-btn')?.addEventListener('click', () => loadDomains({ refresh: true }));
       } else {
-        showSyncErrors([err.message || 'Erro ao escanear e-mails']);
+        showSyncErrors([err.message || 'Error scanning e-mails']);
       }
     } finally {
       domainsSyncing = false;
@@ -1053,14 +1053,14 @@ export async function renderListScreen(container) {
       domainsScanned = result.scanned;
       if (result.errors?.length) showSyncErrors(result.errors);
     } catch (err) {
-      if (folder === 'domains') showSyncErrors([err.message || 'Erro ao carregar mais domínios']);
+      if (folder === 'domains') showSyncErrors([err.message || 'Error loading more domains']);
     } finally {
       domainsLoadingMore = false;
       if (folder === 'domains') renderDomainsList();
     }
   }
 
-  // --- Automatizador: regras que movem e-mails em massa para a lixeira ---
+  // --- Automator: rules that move e-mails to the trash in bulk ---
 
   function filteredRules() {
     if (!automationQuery) return automationRules;
@@ -1071,19 +1071,19 @@ export async function renderListScreen(container) {
   }
 
   function automationRunSummary(rule) {
-    if (!rule.lastRunAt) return 'nunca executada';
-    return `última: ${rule.lastRunCount || 0} e-mail(s) em ${formatDateCompact(rule.lastRunAt)}`;
+    if (!rule.lastRunAt) return 'never run';
+    return `last: ${rule.lastRunCount || 0} e-mail(s) on ${formatDateCompact(rule.lastRunAt)}`;
   }
 
-  // Regras criadas antes do toggle existir não têm o campo — contam como ativas.
+  // Rules created before the toggle existed lack the field — they count as active.
   function isRuleEnabled(rule) {
     return rule.enabled !== false;
   }
 
-  // Cada termo da regra é um DOMÍNIO de remetente, não texto livre: "btg"
-  // quer dizer "e-mails vindos de @btg...". Aceita vários separados por ";"
-  // — ex.: "santander;btg;itau" limpa os três de uma vez — e tolera o usuário
-  // digitando com "@" na frente ou o domínio completo ("kabum.com.br").
+  // Each rule term is a sender DOMAIN, not free text: "acme"
+  // means "e-mails coming from @acme...". It takes several separated by ";"
+  // — e.g. "acmebank;shopco;news" cleans all three at once — and tolerates the user
+  // typing with an "@" in front or the full domain ("shopco.com").
   function ruleTerms(rule) {
     return String(rule.query || '')
       .split(';')
@@ -1091,9 +1091,9 @@ export async function renderListScreen(container) {
       .filter(Boolean);
   }
 
-  // Espaço é o único que some sem virar separador: "BTG PACTUAL" é uma palavra
-  // só ("btgpactual"). Os outros especiais ficam e valem como separador na
-  // comparação; nas pontas ("@kabum", "kabum.") são só ruído de digitação.
+  // Space is the only one that disappears without becoming a separator: "ACME BANK" is one
+  // word ("acmebank"). The other special characters stay and count as separators in the
+  // comparison; at the ends ("@shopco", "shopco.") they are just typing noise.
   function normalizeDomainTerm(term) {
     return String(term || '')
       .toLowerCase()
@@ -1101,9 +1101,9 @@ export async function renderListScreen(container) {
       .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
   }
 
-  // Endereço do remetente a partir do cabeçalho From ("Nome <x@dominio.com>").
-  // Só o endereço: o nome de exibição fica de fora de propósito, senão alguém
-  // que se chama "Kabum" mandando de um Gmail pessoal casaria sem ser da kabum.
+  // The sender's address from the From header ("Name <x@domain.com>").
+  // Only the address: the display name is left out on purpose, otherwise someone
+  // named "Shopco" sending from a personal Gmail would match without being Shopco.
   function senderAddress(from) {
     const raw = String(from || '');
     const inAngles = raw.match(/<([^>]+)>/);
@@ -1111,23 +1111,23 @@ export async function renderListScreen(container) {
     return address.trim().toLowerCase();
   }
 
-  // Todo caractere que não é letra nem número separa um pedaço: "@", ".", "_",
-  // "-", "+"... Vale para o endereço e para o termo, então os dois são
-  // quebrados do mesmo jeito antes de comparar.
+  // Every character that isn't a letter or a digit splits a piece: "@", ".", "_",
+  // "-", "+"... It applies to the address and to the term, so both are
+  // split the same way before comparing.
   const PIECE_SEPARATOR = /[^\p{L}\p{N}]+/u;
 
-  // Comparação por pedaço, e IGUAL — nada de "começa com". Quebra o endereço
-  // inteiro nos separadores e exige que um pedaço seja idêntico ao termo:
+  // Comparison by piece, and EQUAL — no "starts with". It splits the whole
+  // address on the separators and requires one piece to be identical to the term:
   //
-  //   x@e.btgpactual.com.br    →  [x, e, btgpactual, com, br]
-  //   btgpactual@gmail.com     →  [btgpactual, gmail, com]
-  //   no-reply_btgpactual@...  →  [no, reply, btgpactual, ...]
-  //   termo "btgpactual"       →  casa nos três ✓ (antes ou depois do @, tanto faz)
-  //   termo "btg"              →  nenhum pedaço é "btg", então não casa nada
-  //   termo "bb"               →  nenhum pedaço é "bb", então @abbott.com fica
+  //   x@e.acmebank.com         →  [x, e, acmebank, com]
+  //   acmebank@gmail.com       →  [acmebank, gmail, com]
+  //   no-reply_acmebank@...    →  [no, reply, acmebank, ...]
+  //   term "acmebank"          →  matches all three ✓ (before or after the @, either way)
+  //   term "acme"              →  no piece is "acme", so it matches nothing
+  //   term "bb"                →  no piece is "bb", so @abbott.com stays
   //
-  // Termo com separador ("kabum.com.br", "btg-pactual") vale como sequência:
-  // os pedaços dele têm que aparecer na mesma ordem, um do lado do outro.
+  // A term with a separator ("shopco.com", "acme-bank") counts as a sequence:
+  // its pieces must appear in the same order, right next to each other.
   function addressMatchesTerm(address, term) {
     if (!address || !term) return false;
     const pieces = address.split(PIECE_SEPARATOR).filter(Boolean);
@@ -1136,19 +1136,19 @@ export async function renderListScreen(container) {
     return pieces.some((_, i) => wanted.every((w, j) => pieces[i + j] === w));
   }
 
-  // O que a busca do provedor devolve ainda casa assunto/corpo — é só uma
-  // peneira grossa. Quem decide é isto aqui: sem o filtro por remetente, um
-  // e-mail que apenas *cita* "kabum" iria pra lixeira junto com os da kabum.
-  // (Numa conversa, o remetente considerado é o da última mensagem — é o que a
-  // listagem traz, igual ao que aparece na linha da lista.)
+  // What the provider search returns still matches subject/body — it is just a
+  // coarse sieve. This is what decides: without the sender filter, an
+  // e-mail that merely *mentions* "shopco" would go to the trash along with Shopco's.
+  // (In a conversation, the sender considered is the last message's — it is what the
+  // listing brings, the same that shows on the list row.)
   function senderMatchesTerm(from, term) {
     return addressMatchesTerm(senderAddress(from), term);
   }
 
-  // Busca enviada ao provedor: "from:" para o Gmail/Graph já filtrarem por
-  // remetente, com o termo solto no OR porque nem toda busca de provedor casa
-  // pedaço de palavra dentro do endereço — melhor trazer demais e peneirar
-  // aqui do que perder e-mail que deveria sair.
+  // The search sent to the provider: "from:" so Gmail/Graph already filter by
+  // sender, with the loose term in the OR because not every provider search matches
+  // part of a word inside the address — better to bring too much and sift it
+  // here than to miss an e-mail that should go.
   function ruleSearchQuery(term) {
     return `(from:${term} OR ${term})`;
   }
@@ -1158,8 +1158,8 @@ export async function renderListScreen(container) {
     return terms.map((t) => `"${t}"`).join(', ');
   }
 
-  // Dois nomes iguais deixam impossível saber qual regra é qual na lista —
-  // e "Executar todas" vira uma roleta. Comparação sem acento/caixa/espaço extra.
+  // Two equal names make it impossible to know which rule is which in the list —
+  // and "Run all" becomes a lottery. Compared without accents/case/extra spaces.
   function normalizeName(name) {
     return String(name || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
@@ -1177,24 +1177,24 @@ export async function renderListScreen(container) {
     const count = automationRules.length;
     const active = enabledRules().length;
     selectionInfo.textContent = count === 0
-      ? '0 automações'
-      : `${count} ${count === 1 ? 'automação' : 'automações'} · ${active} ativa${active === 1 ? '' : 's'}`;
+      ? '0 automations'
+      : `${count} ${count === 1 ? 'automation' : 'automations'} · ${active} active`;
 
-    // Só faz sentido oferecer "executar todas" se houver alguma ativa.
+    // Offering "run all" only makes sense if some rule is active.
     runAllAutomationsBtn.hidden = folder !== 'automator' || active === 0;
-    runAllAutomationsBtn.textContent = running ? 'Executando...' : `▶ Executar todas (${active})`;
+    runAllAutomationsBtn.textContent = running ? 'Running...' : `▶ Run all (${active})`;
     runAllAutomationsBtn.disabled = running;
   }
 
   async function startAutomatorView() {
-    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Carregando automações...</div>';
+    listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading automations...</div>';
     try {
       automationRules = await getAutomationRules();
     } catch (err) {
       automationRules = [];
-      showSyncErrors([err.message || 'Erro ao carregar automações']);
+      showSyncErrors([err.message || 'Error loading automations']);
     }
-    if (folder !== 'automator') return; // trocou de aba durante o carregamento
+    if (folder !== 'automator') return; // switched tabs during the load
     renderAutomatorList();
   }
 
@@ -1203,11 +1203,11 @@ export async function renderListScreen(container) {
     const filtered = filteredRules();
 
     if (automationRules.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">Nenhuma automação ainda.<br>Clique em "+ Nova automação" para criar uma.</div>';
+      listEl.innerHTML = '<div class="empty-state">No automations yet.<br>Click "+ New automation" to create one.</div>';
       return;
     }
     if (filtered.length === 0) {
-      listEl.innerHTML = `<div class="empty-state">Nada encontrado para "${escapeHtml(automationQuery)}".</div>`;
+      listEl.innerHTML = `<div class="empty-state">Nothing found for "${escapeHtml(automationQuery)}".</div>`;
       return;
     }
 
@@ -1215,21 +1215,21 @@ export async function renderListScreen(container) {
       const on = isRuleEnabled(rule);
       return `
       <div class="automation-row ${on ? '' : 'off'}" data-id="${escapeHtml(rule.id)}">
-        <label class="switch" title="${on ? 'Desativar automação' : 'Ativar automação'}">
+        <label class="switch" title="${on ? 'Disable automation' : 'Enable automation'}">
           <input type="checkbox" class="rule-toggle" data-id="${escapeHtml(rule.id)}" ${on ? 'checked' : ''}>
           <span class="switch-track"></span>
         </label>
         <div class="automation-row-body">
           <div class="automation-row-line1">
             <span class="automation-row-name">${escapeHtml(rule.name)}</span>
-            ${on ? '' : '<span class="automation-off-badge">desativada</span>'}
+            ${on ? '' : '<span class="automation-off-badge">disabled</span>'}
           </div>
           <div class="automation-row-line2">${ruleTerms(rule).length > 1 ? 'remetentes' : 'remetente'}: ${escapeHtml(formatTerms(rule))} · ${automationRunSummary(rule)}</div>
         </div>
         <div class="automation-row-actions">
-          <button class="icon-btn action-run" data-id="${escapeHtml(rule.id)}" title="Executar agora">${ICONS.boltSmall}</button>
-          <button class="icon-btn action-edit" data-id="${escapeHtml(rule.id)}" title="Editar automação">${ICONS.edit}</button>
-          <button class="icon-btn action-delete" data-id="${escapeHtml(rule.id)}" title="Excluir automação">${ICONS.trash}</button>
+          <button class="icon-btn action-run" data-id="${escapeHtml(rule.id)}" title="Run now">${ICONS.boltSmall}</button>
+          <button class="icon-btn action-edit" data-id="${escapeHtml(rule.id)}" title="Edit automation">${ICONS.edit}</button>
+          <button class="icon-btn action-delete" data-id="${escapeHtml(rule.id)}" title="Delete automation">${ICONS.trash}</button>
         </div>
       </div>
     `;
@@ -1249,8 +1249,8 @@ export async function renderListScreen(container) {
     wire('.automation-row .action-edit', (rule) => showRuleForm(rule));
     wire('.automation-row .action-delete', (rule) => removeRule(rule));
 
-    // Clicar na linha (fora dos botões) abre a edição — o painel da direita é
-    // só de execução agora, não tem mais "detalhe da regra" pra abrir.
+    // Clicking the row (outside the buttons) opens the edit — the right pane is
+    // only for runs now, there's no "rule detail" to open any more.
     listEl.querySelectorAll('.automation-row').forEach((row) => {
       row.addEventListener('click', (e) => {
         if (e.target.closest('.icon-btn') || e.target.closest('.switch')) return;
@@ -1268,36 +1268,36 @@ export async function renderListScreen(container) {
     });
   }
 
-  // Ativar/desativar não mexe em e-mail nenhum — só decide se a regra entra no
-  // "Executar todas". Rodar uma regra desativada na mão continua permitido.
+  // Enabling/disabling touches no e-mail at all — it only decides whether the rule joins
+  // "Run all". Running a disabled rule by hand is still allowed.
   async function setRuleEnabled(rule, enabled) {
     const previous = isRuleEnabled(rule);
-    rule.enabled = enabled; // otimista: a lista já re-renderiza com o novo estado
+    rule.enabled = enabled; // optimistic: the list already re-renders with the new state
     renderAutomatorList();
     try {
       automationRules = await saveAutomationRule({ id: rule.id, enabled });
     } catch (err) {
       rule.enabled = previous;
-      showSyncErrors([err.message || 'Erro ao salvar a automação']);
+      showSyncErrors([err.message || 'Error saving the automation']);
     }
     if (folder === 'automator') renderAutomatorList();
   }
 
-  // Criação e edição acontecem num modal centralizado — o painel de leitura
-  // fica reservado para consultar/executar a automação.
+  // Creating and editing happen in a centered modal — the reading pane
+  // is kept for viewing/running the automation.
   async function showRuleForm(rule = null) {
     const isEdit = !!rule;
     const values = await automationFormDialog({
       rule,
       validate: ({ name, query: q }) => {
-        if (!name || !q) return 'Preencha o nome e os remetentes.';
-        if (ruleTerms({ query: q }).length === 0) return 'Informe pelo menos um remetente válido.';
+        if (!name || !q) return 'Fill in the name and the senders.';
+        if (ruleTerms({ query: q }).length === 0) return 'Enter at least one valid sender.';
         const duplicate = findDuplicateName(name, isEdit ? rule.id : null);
-        if (duplicate) return `Já existe uma automação chamada "${duplicate.name}". Escolha outro nome.`;
+        if (duplicate) return `An automation named "${duplicate.name}" already exists. Pick another name.`;
         return null;
       },
     });
-    if (!values) return; // cancelou
+    if (!values) return; // cancelled
 
     const id = isEdit ? rule.id : crypto.randomUUID();
     try {
@@ -1308,7 +1308,7 @@ export async function renderListScreen(container) {
         enabled: isEdit ? isRuleEnabled(rule) : true,
       });
     } catch (err) {
-      showSyncErrors([err.message || 'Erro ao salvar automação']);
+      showSyncErrors([err.message || 'Error saving automation']);
       return;
     }
     if (folder !== 'automator') return;
@@ -1317,28 +1317,28 @@ export async function renderListScreen(container) {
 
   async function removeRule(rule) {
     const confirmed = await confirmDialog({
-      title: `Excluir a automação "${rule.name}"?`,
-      message: 'Os e-mails já existentes não são afetados.',
-      confirmLabel: 'Excluir',
+      title: `Delete the automation "${rule.name}"?`,
+      message: 'Existing e-mails are not affected.',
+      confirmLabel: 'Delete',
       danger: true,
     });
     if (!confirmed) return;
     try {
       automationRules = await deleteAutomationRule(rule.id);
     } catch (err) {
-      showSyncErrors([err.message || 'Erro ao excluir automação']);
+      showSyncErrors([err.message || 'Error deleting automation']);
       return;
     }
     if (folder !== 'automator') return;
     renderAutomatorList();
   }
 
-  // Junta todas as páginas de uma busca — a exclusão em massa precisa da lista
-  // inteira, não só da primeira página.
+  // Gathers every page of a search — the bulk deletion needs the whole
+  // list, not only the first page.
   async function collectMatchingEmails(searchQuery) {
     let result = await listEmails({ folder: 'inbox', query: searchQuery, sortOrder: 'desc' });
     let all = result.emails;
-    let guard = 0; // trava contra loop infinito (se hasMore ficar preso em true)
+    let guard = 0; // guard against an infinite loop (if hasMore gets stuck on true)
     while (result.hasMore && guard < 500) {
       guard++;
       const before = all.length;
@@ -1349,19 +1349,19 @@ export async function renderListScreen(container) {
     return all;
   }
 
-  // Busca, um domínio de cada vez, tudo que casa com a regra. Sequencial de
-  // propósito (cada busca já pagina várias vezes no servidor) e sem repetir
-  // e-mail: dois termos da mesma regra costumam cair na mesma conversa.
+  // Fetches, one domain at a time, everything matching the rule. Sequential on
+  // purpose (each search already pages several times on the server) and without repeating
+  // e-mails: two terms of the same rule often land in the same conversation.
   async function collectRuleMatches(rule, onSearch) {
     const terms = ruleTerms(rule);
     const seen = new Set();
-    const matches = []; // { id, query } — a query vai junto porque a exclusão a usa pra ajustar o cache
+    const matches = []; // { id, query } — the query goes along because the deletion uses it to adjust the cache
     for (let i = 0; i < terms.length; i++) {
       onSearch?.({ term: terms[i], index: i, total: terms.length, found: matches.length });
       const searchQuery = ruleSearchQuery(terms[i]);
       for (const email of await collectMatchingEmails(searchQuery)) {
         if (seen.has(email.id)) continue;
-        // Só sai o que veio DO domínio; citação no assunto/corpo não conta.
+        // Only what came FROM the domain goes; a mention in the subject/body doesn't count.
         if (!senderMatchesTerm(email.from, terms[i])) continue;
         seen.add(email.id);
         matches.push({ id: email.id, query: searchQuery });
@@ -1370,17 +1370,17 @@ export async function renderListScreen(container) {
     return matches;
   }
 
-  // Núcleo da execução de uma regra, sem nada de interface: busca tudo que casa
-  // com os termos, move para a lixeira e devolve o resumo. Quem chama decide
-  // como mostrar (execução avulsa no painel da regra ou "executar todas").
+  // The core of running a rule, with no UI at all: fetches everything matching
+  // the terms, moves it to the trash and returns the summary. The caller decides
+  // how to show it (a single run in the rule's pane or "run all").
   async function executeRule(rule, { onSearch, onProgress } = {}) {
     const matches = await collectRuleMatches(rule, onSearch);
     if (matches.length === 0) return { total: 0, okCount: 0, failCount: 0, networkDown: false };
 
     let done = 0;
-    // Se a rede cair no meio, não adianta insistir em cada e-mail restante:
-    // assim que der um erro de conexão, os pedidos seguintes já saem curto-
-    // circuitados (evita disparar dezenas de requests condenados).
+    // If the network drops midway, there's no point insisting on each remaining e-mail:
+    // as soon as a connection error shows up, the following requests are
+    // short-circuited (avoids firing dozens of doomed requests).
     let networkDown = false;
     onProgress?.({ done: 0, total: matches.length });
     const results = await mapWithConcurrencySettled(matches, DELETE_CONCURRENCY, async ({ id, query: searchQuery }) => {
@@ -1397,7 +1397,7 @@ export async function renderListScreen(container) {
     });
     const okCount = results.filter((r) => r.status === 'fulfilled').length;
 
-    // Só registra estatística de execução se de fato moveu algo.
+    // Only records run stats if it actually moved something.
     if (okCount > 0) {
       try {
         automationRules = await saveAutomationRule({ id: rule.id, lastRunAt: Date.now(), lastRunCount: okCount });
@@ -1407,22 +1407,22 @@ export async function renderListScreen(container) {
     return { total: matches.length, okCount, failCount: results.length - okCount, networkDown };
   }
 
-  // Texto curto do resultado de uma regra — mesma frase na execução avulsa e
-  // na execução em massa, já que agora as duas usam o mesmo painel.
+  // A short text for a rule's result — the same sentence in a single run and
+  // in the bulk run, since both now use the same pane.
   function runResultMessage({ total, okCount, failCount, networkDown }) {
-    if (total === 0) return { text: 'nada encontrado', cls: '' };
-    if (networkDown) return { text: `sem conexão — ${okCount} movido(s) antes de cair`, cls: 'error' };
-    if (failCount > 0) return { text: `${okCount} movido(s), ${failCount} com erro`, cls: 'error' };
+    if (total === 0) return { text: 'nothing found', cls: '' };
+    if (networkDown) return { text: `no connection — ${okCount} moved before it dropped`, cls: 'error' };
+    if (failCount > 0) return { text: `${okCount} moved, ${failCount} failed`, cls: 'error' };
     return { text: `${okCount} e-mail(s) para a lixeira`, cls: 'success' };
   }
 
-  // Painel de execução (lado direito). Uma linha por regra — vale tanto pro
-  // "Executar todas" quanto pra execução de uma só.
+  // The run pane (right side). One row per rule — it serves both
+  // "Run all" and a single run.
   function renderRunPanel(rules, title) {
     readingPane.innerHTML = `
       <div class="reading-header">
         <div class="reading-header-top">
-          <div class="email-meta"><span class="automation-badge">Executando</span></div>
+          <div class="email-meta"><span class="automation-badge">Running</span></div>
         </div>
         <h2>${escapeHtml(title)}</h2>
       </div>
@@ -1430,7 +1430,7 @@ export async function renderListScreen(container) {
         ${rules.map((rule) => `
           <div class="run-all-item" data-id="${escapeHtml(rule.id)}">
             <span class="run-all-item-name">${escapeHtml(rule.name)}</span>
-            <span class="run-all-item-status">na fila</span>
+            <span class="run-all-item-status">queued</span>
           </div>
         `).join('')}
       </div>
@@ -1438,9 +1438,9 @@ export async function renderListScreen(container) {
     `;
   }
 
-  // Executa uma lista de regras, uma de cada vez. Sequencial de propósito:
-  // cada regra já dispara DELETE_CONCURRENCY exclusões em paralelo, e rodar
-  // várias juntas estoura o limite de requests simultâneos da API.
+  // Runs a list of rules, one at a time. Sequential on purpose:
+  // each rule already fires DELETE_CONCURRENCY deletions in parallel, and running
+  // several together blows the API's simultaneous request limit.
   async function runRules(rules, { confirmTitle, confirmMessage, panelTitle }) {
     if (running) return;
     if (rules.length === 0) return;
@@ -1448,7 +1448,7 @@ export async function renderListScreen(container) {
     const confirmed = await confirmDialog({
       title: confirmTitle,
       message: confirmMessage,
-      confirmLabel: 'Executar',
+      confirmLabel: 'Run',
       danger: true,
     });
     if (!confirmed) return;
@@ -1459,7 +1459,7 @@ export async function renderListScreen(container) {
 
     const setItemStatus = (id, html, cls = '') => {
       const el = readingPane.querySelector(`.run-all-item[data-id="${CSS.escape(id)}"] .run-all-item-status`);
-      if (!el) return; // painel foi substituído — só ignora
+      if (!el) return; // the pane was replaced — just ignore it
       el.className = `run-all-item-status ${cls}`.trim();
       el.innerHTML = html;
     };
@@ -1476,8 +1476,8 @@ export async function renderListScreen(container) {
       for (let i = 0; i < rules.length; i++) {
         const rule = rules[i];
         setSummary(rules.length > 1
-          ? `<div class="spinner-small"></div>Executando ${i + 1} de ${rules.length}: ${escapeHtml(rule.name)}...`
-          : `<div class="spinner-small"></div>Executando "${escapeHtml(rule.name)}"...`);
+          ? `<div class="spinner-small"></div>Running ${i + 1} of ${rules.length}: ${escapeHtml(rule.name)}...`
+          : `<div class="spinner-small"></div>Running "${escapeHtml(rule.name)}"...`);
         readingPane.querySelector(`.run-all-item[data-id="${CSS.escape(rule.id)}"]`)?.classList.add('running');
         setItemStatus(rule.id, 'procurando...');
         try {
@@ -1493,16 +1493,16 @@ export async function renderListScreen(container) {
           if (result.failCount > 0 || result.networkDown) failedRules++;
           const { text, cls } = runResultMessage(result);
           setItemStatus(rule.id, escapeHtml(text), cls);
-          // Rede caiu: as próximas regras só somariam erro em cima de erro.
+          // The network dropped: the next rules would only pile error upon error.
           if (result.networkDown) {
-            setSummary('Sem conexão estável com a internet — execução interrompida. Verifique a rede e tente de novo.', 'error');
+            setSummary('No stable internet connection — the run was stopped. Check the network and try again.', 'error');
             return;
           }
         } catch (err) {
           failedRules++;
           setItemStatus(rule.id, escapeHtml(err.message || 'erro'), 'error');
           if (isNetworkError(err)) {
-            setSummary('Sem conexão com a internet — execução interrompida. Verifique sua rede e tente de novo.', 'error');
+            setSummary('No internet connection — the run was stopped. Check your network and try again.', 'error');
             return;
           }
         } finally {
@@ -1512,8 +1512,8 @@ export async function renderListScreen(container) {
 
       setSummary(
         failedRules > 0
-          ? `✓ ${totalMoved} e-mail(s) movido(s) para a lixeira. ${failedRules} automação(ões) com erro.`
-          : `✓ Concluído — ${totalMoved} e-mail(s) movido(s) para a lixeira.`,
+          ? `✓ ${totalMoved} e-mail(s) moved to the trash. ${failedRules} automation(s) failed.`
+          : `✓ Done — ${totalMoved} e-mail(s) moved to the trash.`,
         failedRules > 0 ? 'error' : 'success'
       );
     } finally {
@@ -1525,10 +1525,10 @@ export async function renderListScreen(container) {
   function runRule(rule) {
     const terms = ruleTerms(rule);
     return runRules([rule], {
-      confirmTitle: `Executar "${rule.name}"?`,
+      confirmTitle: `Run "${rule.name}"?`,
       confirmMessage: terms.length > 1
-        ? `Isso vai procurar todos os e-mails recebidos de qualquer um destes ${terms.length} remetentes — ${formatTerms(rule)} — e movê-los para a lixeira.`
-        : `Isso vai procurar todos os e-mails recebidos de "${terms[0] || rule.query}" e movê-los para a lixeira.`,
+        ? `This will look for every e-mail received from any of these ${terms.length} senders — ${formatTerms(rule)} — and move them to the trash.`
+        : `This will look for every e-mail received from "${terms[0] || rule.query}" and move them to the trash.`,
       panelTitle: rule.name,
     });
   }
@@ -1538,20 +1538,20 @@ export async function renderListScreen(container) {
     if (rules.length === 0) return;
     const plural = rules.length === 1 ? '' : 's';
     return runRules(rules, {
-      confirmTitle: `Executar ${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}?`,
-      confirmMessage: 'As automações desativadas ficam de fora. Todos os e-mails recebidos dos remetentes cadastrados serão movidos para a lixeira.',
-      panelTitle: `${rules.length} automação${rules.length === 1 ? '' : 'ões'} ativa${plural}`,
+      confirmTitle: `Run ${rules.length} active automation${plural}?`,
+      confirmMessage: 'Disabled automations are left out. Every e-mail received from the registered senders will be moved to the trash.',
+      panelTitle: `${rules.length} active automation${plural}`,
     });
   }
 
-  // --- Eventos da barra ---
+  // --- Bar events ---
 
   folderNavItems.forEach((item) => {
     item.addEventListener('click', () => switchFolder(item.dataset.folder));
   });
 
-  // A busca de e-mails vai ao servidor (Gmail/Graph); a de domínios é local
-  // (os domínios já escaneados ficam todos na memória, filtro é instantâneo).
+  // The e-mail search goes to the server (Gmail/Graph); the domain one is local
+  // (the scanned domains all stay in memory, the filter is instant).
   let searchTimer = null;
   searchInput.addEventListener('input', () => {
     if (folder === 'domains') {
@@ -1603,11 +1603,11 @@ export async function renderListScreen(container) {
     searchInput.focus();
   });
 
-  // --- Filtro de período (calendário com seleção de intervalo) e ordem de exibição ---
+  // --- Period filter (calendar with range selection) and display order ---
 
   const MONTH_LABELS = [
-    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
   function formatDateInput(date) {
@@ -1631,7 +1631,7 @@ export async function renderListScreen(container) {
   }
 
   function updateSortToggleUI() {
-    sortToggleBtn.title = sortOrder === 'asc' ? 'Mais antigos primeiro' : 'Mais recentes primeiro';
+    sortToggleBtn.title = sortOrder === 'asc' ? 'Oldest first' : 'Newest first';
     sortToggleBtn.classList.toggle('flipped', sortOrder === 'asc');
   }
 
@@ -1671,7 +1671,7 @@ export async function renderListScreen(container) {
   function openFilterPopover() {
     filterPopoverOpen = true;
     filterPopover.hidden = false;
-    // Recomeça a seleção do calendário a partir do filtro já aplicado (se houver).
+    // Restarts the calendar selection from the filter already applied (if any).
     rangeStart = dateFrom ? parseDateInput(dateFrom) : null;
     rangeEnd = dateTo ? parseDateInput(dateTo) : null;
     hoverDate = null;
@@ -1691,7 +1691,7 @@ export async function renderListScreen(container) {
     else openFilterPopover();
   });
 
-  // Fecha ao clicar fora do popover (mas não ao clicar dentro dele).
+  // Closes on a click outside the popover (but not on a click inside it).
   document.addEventListener('click', (e) => {
     if (!filterPopoverOpen || filterWrapEl.contains(e.target)) return;
     closeFilterPopover();
@@ -1773,16 +1773,16 @@ export async function renderListScreen(container) {
   emptyTrashBtn.addEventListener('click', async () => {
     if (emails.length === 0 || mutatingInFlight) return;
     const confirmed = await confirmDialog({
-      title: 'Esvaziar a lixeira?',
-      message: 'Todos os e-mails da lixeira serão excluídos definitivamente. Essa ação não pode ser desfeita.',
-      confirmLabel: 'Esvaziar',
+      title: 'Empty the trash?',
+      message: 'Every e-mail in the trash will be permanently deleted. This cannot be undone.',
+      confirmLabel: 'Empty',
       danger: true,
     });
     if (!confirmed) return;
 
     mutatingInFlight = true;
     emptyTrashBtn.disabled = true;
-    emptyTrashBtn.textContent = 'Esvaziando...';
+    emptyTrashBtn.textContent = 'Emptying...';
     try {
       await emptyTrash();
       emails = [];
@@ -1792,11 +1792,11 @@ export async function renderListScreen(container) {
       clearReadingPane();
       renderList();
     } catch (err) {
-      showSyncErrors([err.message || 'Erro ao esvaziar a lixeira']);
+      showSyncErrors([err.message || 'Error emptying the trash']);
     } finally {
       mutatingInFlight = false;
       emptyTrashBtn.disabled = false;
-      emptyTrashBtn.textContent = 'Esvaziar lixeira';
+      emptyTrashBtn.textContent = 'Empty trash';
     }
   });
 
@@ -1822,14 +1822,14 @@ export async function renderListScreen(container) {
     else if (isEmailFolder(folder)) loadMore();
   });
 
-  // --- Zoom do corpo do e-mail ---
+  // --- E-mail body zoom ---
 
   zoomOutBtn.addEventListener('click', () => applyBodyZoom(bodyZoom - 0.1));
   zoomInBtn.addEventListener('click', () => applyBodyZoom(bodyZoom + 0.1));
   zoomLabel.addEventListener('click', () => applyBodyZoom(1));
 
-  // Vem do menu nativo (Exibir → zoom / Ctrl+=, Ctrl+-, Ctrl+0). Se a tela já
-  // não existe mais (usuário navegou para outra), se desinscreve sozinho.
+  // Comes from the native menu (View → zoom / Ctrl+=, Ctrl+-, Ctrl+0). If the screen
+  // no longer exists (the user navigated elsewhere), it unsubscribes on its own.
   const unsubscribeZoom = onZoomChange((action) => {
     if (!container.contains(zoomLabel)) {
       unsubscribeZoom();
@@ -1839,7 +1839,7 @@ export async function renderListScreen(container) {
     else applyBodyZoom(bodyZoom + action);
   });
 
-  // --- Divisor arrastável entre a lista e a leitura (35%–65%) ---
+  // --- Draggable divider between the list and the reading pane (35%–65%) ---
 
   let draggingDivider = false;
   splitDivider.addEventListener('mousedown', (e) => {
@@ -1863,7 +1863,7 @@ export async function renderListScreen(container) {
     splitDivider.classList.remove('dragging');
   });
 
-  // --- Atalhos de teclado ---
+  // --- Keyboard shortcuts ---
   document.addEventListener('keydown', (e) => {
     if (!container.querySelector('#email-list')) {
       keyboardController.abort();
@@ -1872,7 +1872,7 @@ export async function renderListScreen(container) {
     handleKeyboardShortcuts(e);
   }, { signal: keyboardController.signal });
 
-  // --- Carga inicial ---
+  // --- Initial load ---
 
   bodyZoom = await getBodyZoom();
   updateZoomLabel();
@@ -1883,8 +1883,8 @@ export async function renderListScreen(container) {
   if (accounts.length === 0) {
     listEl.innerHTML = `
       <div class="empty-state">
-        <p>Nenhuma conta conectada.</p>
-        <button class="btn btn-primary" id="add-account-btn" style="margin-top: 16px;">Adicionar conta</button>
+        <p>No accounts connected.</p>
+        <button class="btn btn-primary" id="add-account-btn" style="margin-top: 16px;">Add account</button>
       </div>
     `;
     container.querySelector('#add-account-btn')?.addEventListener('click', () => navigate('login'));
@@ -1894,18 +1894,18 @@ export async function renderListScreen(container) {
   await sync({ refresh: false });
 }
 
-// Renderiza o HTML do e-mail num <iframe sandbox>, isolado do documento do app —
-// mesma técnica que Gmail/Outlook usam. Isso garante fidelidade total (inclui
-// <style>, tabelas, fontes do próprio e-mail) sem que esse CSS vaze para o app,
-// e o sandbox (sem allow-scripts) desativa qualquer script/handler embutido.
+// Renders the e-mail HTML in an <iframe sandbox>, isolated from the app document —
+// the same technique Gmail/Outlook use. That guarantees full fidelity (including the
+// e-mail's own <style>, tables and fonts) without that CSS leaking into the app,
+// and the sandbox (no allow-scripts) disables any embedded script/handler.
 function renderHtmlBody(host, html, { onLinkClick, onKeydown, zoom = 1 } = {}) {
   const iframe = document.createElement('iframe');
   iframe.className = 'detail-body-frame';
   iframe.setAttribute('sandbox', 'allow-same-origin');
   host.replaceWith(iframe);
 
-  // O app é escuro, mas os e-mails HTML são desenhados para fundo claro — o
-  // iframe vira uma "folha de papel" branca (mesma abordagem do Gmail escuro).
+  // The app is dark, but HTML e-mails are designed for a light background — the
+  // iframe becomes a white "sheet of paper" (the same approach as dark Gmail).
   const doc = `<!doctype html><html><head><meta charset="utf-8"><style>
     html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #212121; background: #ffffff; }
     body { padding: 14px 16px; word-wrap: break-word; }
@@ -1922,7 +1922,7 @@ function renderHtmlBody(host, html, { onLinkClick, onKeydown, zoom = 1 } = {}) {
       iframe.style.height = `${idoc.documentElement.scrollHeight}px`;
     };
 
-    // Exposto para o controle de zoom da barra reaplicar sem recarregar o iframe.
+    // Exposed so the bar's zoom control can reapply it without reloading the iframe.
     iframe._applyZoom = (z) => {
       idoc.documentElement.style.zoom = z;
       resize();
@@ -1938,7 +1938,7 @@ function renderHtmlBody(host, html, { onLinkClick, onKeydown, zoom = 1 } = {}) {
       onLinkClick?.(link.href);
     });
 
-    // Encaminha atalhos de teclado mesmo com o foco dentro do corpo do e-mail.
+    // Forwards keyboard shortcuts even with focus inside the e-mail body.
     if (onKeydown) idoc.addEventListener('keydown', onKeydown);
   });
 
@@ -1950,9 +1950,9 @@ function stripScripts(html) {
   return html.replace(/<script[\s\S]*?<\/script>/gi, '');
 }
 
-// Erros de rede/DNS (getaddrinfo EAI_AGAIN, host não encontrado, conexão
-// recusada/estourada, etc.) — usados para dar uma mensagem clara de "sem
-// conexão" em vez de vazar o erro cru da API.
+// Network/DNS errors (getaddrinfo EAI_AGAIN, host not found, connection
+// refused/timed out, etc.) — used to give a clear "no connection" message
+// instead of leaking the raw API error.
 function isNetworkError(err) {
   const msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
   return /eai_again|enotfound|econnrefused|econnreset|etimedout|epipe|getaddrinfo|network|failed to fetch|socket hang up|offline/.test(msg);
@@ -1969,17 +1969,17 @@ function formatDateCompact(isoString) {
   const date = new Date(isoString);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
   if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   }
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  return date.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 function formatDateFull(isoString) {
   if (!isoString) return '';
-  return new Date(isoString).toLocaleString('pt-BR', {
+  return new Date(isoString).toLocaleString(undefined, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

@@ -9,9 +9,9 @@ package-lock.json
 dist/
 out/
 
-# Segredos / configuração local
+# Secrets / local configuration
 .env
 
-# Sistema
+# System
 .DS_Store
 *.log

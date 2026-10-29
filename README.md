@@ -1,103 +1,104 @@
 # Mail Reader
 
-Leitor de e-mail local com **Electron + Node.js**. Não há backend remoto: a conexão com Gmail e Outlook acontece diretamente na máquina do usuário, via OAuth, e tudo (credenciais, tokens, cache de e-mails) fica salvo localmente e criptografado.
+A local e-mail reader built with **Electron + Node.js**. There is no remote backend: the connection to Gmail and Outlook happens directly on the user's machine, through OAuth, and everything (credentials, tokens, e-mail cache) is stored locally and encrypted.
 
-> ⚖️ **Antes de usar, leia os [Termos de Uso](TERMOS-DE-USO.md).** O aceite é solicitado no primeiro acesso ao app. Em resumo: uso pessoal é livre e gratuito; **qualquer monetização em cima do projeto obriga o repasse de 50% do lucro ao autor** (detalhes no documento).
+> ⚖️ **Before using it, read the [Terms of Use](TERMS-OF-USE.md).** Acceptance is requested on the first use of the app. In short: personal use is free of charge; **any monetization built on the project requires sharing 50% of the profit with the author** (details in the document).
 
-## Como funciona
+## How it works
 
-1. **Primeiro acesso:** o app mostra os Termos de Uso (aceitar para continuar) e depois a tela **"Configurar OAuth"**, com tutorial passo a passo.
-2. **Você cria suas próprias credenciais** OAuth no Google/Microsoft (uma única vez, gratuito), cola os códigos nos campos e o app salva tudo **no `.env` local da sua máquina** — nada vem embutido, nada é enviado para fora.
-3. Daí em diante é só clicar em **"Entrar com Google"** ou **"Entrar com Outlook"**: o navegador abre na tela oficial do provedor, você autoriza, e pronto.
-4. A caixa de entrada unificada mostra os e-mails de todas as contas, com painel de leitura lateral, busca e seleção múltipla, além de uma nav lateral com **Spam**, **Lixeira**, **Automatizador** (regras de limpeza em massa) e **Domínios** (de quais sites/serviços você recebe e-mail).
+1. **First use:** the app shows the Terms of Use (accept to continue) and then the **"Set up OAuth"** screen, with a step-by-step tutorial.
+2. **You create your own OAuth credentials** on Google/Microsoft (only once, free of charge), paste the codes into the fields and the app saves everything **in your machine's local `.env`** — nothing comes embedded, nothing is sent out.
+3. From then on just click **"Sign in with Google"** or **"Sign in with Outlook"**: the browser opens the provider's official screen, you authorize it, and you're done.
+4. The unified inbox shows the e-mails of every account, with a side reading pane, search and multi-selection, plus a side nav with **Spam**, **Trash**, **Automator** (bulk cleanup rules) and **Domains** (which sites/services you get e-mail from).
 
-## Requisitos
+## Requirements
 
 - Node.js 18+
 - npm 9+
 
-## Estrutura do projeto
+## Project layout
 
-- `source/` — todo o código do app (Electron + Node.js)
-- `README.md`, `TERMOS-DE-USO.md`, `start.sh`, `install-desktop.sh` — documentação e scripts, na raiz
+- `source/` — all of the app code (Electron + Node.js)
+- `README.md`, `TERMS-OF-USE.md`, `start.sh`, `install-desktop.sh` — docs and scripts, at the root
 
-## Como executar
+## Running
 
 ```bash
 cd source
 npm install
-npm start        # ou ./start.sh (na raiz do projeto)
+npm start        # or ./start.sh (at the project root)
 ```
 
-### Instalar como app do desktop (Linux)
+### Install as a desktop app (Linux)
 
-Para criar um atalho no menu de aplicativos, com ícone:
+To create a launcher in the applications menu, with an icon:
 
 ```bash
-./install-desktop.sh              # instala/atualiza o atalho
-./install-desktop.sh --uninstall  # remove
+./install-desktop.sh              # installs/updates the launcher
+./install-desktop.sh --uninstall  # removes it
 ```
 
-## Configuração OAuth (feita por você, uma única vez)
+## OAuth setup (done by you, only once)
 
-O app te guia com links e tutorial na própria tela de configuração. Resumo:
+The app guides you with links and a tutorial on the setup screen itself. In short:
 
 ### Google (Gmail)
 
-1. Acesse [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) e crie um projeto (qualquer nome).
-2. Ative a [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
-3. Configure a **OAuth consent screen** (tipo **External**).
-4. Em [Audience → Test users](https://console.cloud.google.com/auth/audience), **adicione seu Gmail** (sem isso o login dá erro 403).
-5. Ainda em [Audience](https://console.cloud.google.com/auth/audience), clique em **Publicar app** (status **Em produção**). ⚠️ Enquanto o projeto ficar em **Testing**, o Google **expira o refresh token a cada 7 dias** e você precisa refazer o login toda semana. Publicado, a sessão não expira sozinha. Como o escopo do Gmail é sensível, o login passa a mostrar um aviso de "app não verificado" — vá em **Avançado → Acessar (não seguro)**; a verificação do Google só é necessária para distribuir o app a outras pessoas.
-6. Em **Credentials → Create Credentials → OAuth client ID**, tipo **Desktop app**.
-7. Copie o **Client ID** (`...apps.googleusercontent.com`) e o **Client Secret** (`GOCSPX-...`) e cole na tela de configuração do app.
+1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and create a project (any name).
+2. Enable the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
+3. Set up the **OAuth consent screen** (type **External**).
+4. Under [Audience → Test users](https://console.cloud.google.com/auth/audience), **add your Gmail** (without it the sign-in fails with error 403).
+5. Still under [Audience](https://console.cloud.google.com/auth/audience), click **Publish app** (status **In production**). ⚠️ While the project stays in **Testing**, Google **expires the refresh token every 7 days** and you have to sign in again every week. Once published, the session doesn't expire on its own. Since the Gmail scope is sensitive, the sign-in then shows an "unverified app" warning — go to **Advanced → Go to (unsafe)**; Google's verification is only needed to distribute the app to other people.
+6. Under **Credentials → Create Credentials → OAuth client ID**, type **Desktop app**.
+7. Copy the **Client ID** (`...apps.googleusercontent.com`) and the **Client Secret** (`GOCSPX-...`) and paste them on the app's setup screen.
 
 ### Microsoft (Outlook)
 
-1. Acesse [Azure → App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) → **New registration** (contas pessoais + organizacionais).
-2. Em **Authentication → Add a platform → Mobile and desktop applications**, adicione o redirect URI `http://localhost:42814/oauth2callback`.
-3. Copie o **Application (client) ID** e cole no app.
+1. Open [Azure → App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) → **New registration** (personal + organizational accounts).
+2. Under **Authentication → Add a platform → Mobile and desktop applications**, add the redirect URI `http://localhost:42814/oauth2callback`.
+3. Copy the **Application (client) ID** and paste it into the app.
 
-### Onde isso fica salvo?
+### Where is it saved?
 
-No arquivo **`.env` dentro de `source/`, criado pelo próprio app** — local da sua máquina e ignorado pelo git (nunca commite). Redirect URIs usados: Google `http://localhost:42813/oauth2callback` (liberado automaticamente para apps Desktop), Microsoft `http://localhost:42814/oauth2callback`.
+In the **`.env` file inside `source/`, created by the app itself** — local to your machine and ignored by git (never commit it). Redirect URIs used: Google `http://localhost:42813/oauth2callback` (allowed automatically for Desktop apps), Microsoft `http://localhost:42814/oauth2callback`.
 
-### Outro computador?
+### Another computer?
 
-A configuração no Google/Azure é feita **uma vez só**. No novo computador, copie o seu `.env` para lá — ou simplesmente cole os mesmos códigos de novo na tela de configuração.
+The Google/Azure setup is done **only once**. On the new computer, copy your `.env` there — or simply paste the same codes again on the setup screen.
 
-## Funcionalidades
+## Features
 
-- Login OAuth com Google (Gmail) e Microsoft (Outlook)
-- Caixa de entrada unificada com painel de leitura lateral
-- Navegação de pastas em coluna vertical à esquerda da lista (Entrada, Spam, Lixeira, Automatizador, Domínios)
-- Lixeira: excluir move para a lixeira (sem diálogo de confirmação); lá é possível restaurar ou excluir de vez
-- **Spam:** lista o que Gmail/Outlook marcaram como spam, com busca e filtros iguais aos da caixa de entrada; dá para marcar "não é spam" (volta para a entrada) ou mandar para a lixeira
-- Busca por remetente, assunto e conteúdo, com filtro por período e ordenação
-- Seleção múltipla, exclusão e restauração em lote
-- **Domínios:** agrupa os remetentes por domínio, mostrando de quais sites/serviços você recebe e-mail (e quantos) — com um clique você filtra a caixa por aquele domínio
-- **Automatizador:** regras de limpeza salvas — cada regra guarda um ou mais **remetentes** separados por `;` (ex.: `btgpactual;santander;kabum`) e, ao ser executada, move para a lixeira todos os e-mails **recebidos de** cada um deles. Citar o nome no assunto ou no corpo não conta: o endereço de quem enviou é quebrado em todo caractere especial (`@ . _ - +`) e algum pedaço tem que ser **igual** ao termo — `btgpactual` casa com `x@e.btgpactual.com.br`, `btgpactual@gmail.com` e `no-reply_btgpactual@mkt.com`, enquanto `btg` não casa nada e `bb` não pega `@abbott.com`. O que você digita é normalizado para minúsculo e sem espaço (`BTG PACTUAL` → `btgpactual`); termo com separador (`kabum.com.br`, `btg-pactual`) exige os pedaços na mesma ordem, colados
-- Zoom ajustável do corpo do e-mail
-- Cache local criptografado (abertura instantânea, menos requests)
-- Armazenamento 100% local: tokens e cache criptografados com o `safeStorage` do Electron
+- OAuth sign-in with Google (Gmail) and Microsoft (Outlook)
+- A unified inbox with a side reading pane
+- Folder navigation in a vertical column left of the list (Inbox, Spam, Trash, Automator, Domains)
+- Trash: deleting moves to the trash (with no confirmation dialog); from there you can restore or delete forever
+- **Spam:** lists what Gmail/Outlook marked as spam, with the same search and filters as the inbox; you can mark "not spam" (back to the inbox) or send it to the trash
+- Search by sender, subject and content, with a period filter and sorting
+- Multi-selection, bulk deletion and restore
+- **Domains:** groups senders by domain, showing which sites/services you get e-mail from (and how many) — one click filters the mailbox by that domain
+- **Automator:** saved cleanup rules — each rule holds one or more **senders** separated by `;` (e.g. `acmebank;shopco;newsletter`) and, when run, moves to the trash every e-mail **received from** each of them. Mentioning the name in the subject or body doesn't count: the sender's address is split on every special character (`@ . _ - +`) and some piece has to **equal** the term — `acmebank` matches `x@e.acmebank.com`, `acmebank@gmail.com` and `no-reply_acmebank@mkt.com`, while `acme` matches nothing and `bb` doesn't catch `@abbott.com`. What you type is normalized to lowercase without spaces (`ACME BANK` → `acmebank`); a term with a separator (`shopco.com`, `acme-bank`) requires the pieces in the same order, right next to each other
+- Adjustable e-mail body zoom
+- An encrypted local cache (instant opening, fewer requests)
+- 100% local storage: tokens and cache encrypted with Electron's `safeStorage`
 
-## Atalhos
+## Shortcuts
 
-- **`Delete`**: exclui o e-mail aberto e já seleciona o próximo da lista
-- **`↑` / `↓`**: navega entre os e-mails da lista (sobe/desce e abre o próximo)
+- **`Delete`**: deletes the open e-mail and selects the next one in the list
+- **`↑` / `↓`**: moves between the e-mails in the list (up/down and opens the next one)
+- **`Shift` + `↑` / `↓`**: selects several e-mails in a row
 
-## Segurança e privacidade
+## Security and privacy
 
-- **100% local:** não existe servidor do autor. A comunicação vai direto do seu computador para as APIs do Google/Microsoft.
-- **Suas credenciais, sua máquina:** os Client IDs/Secrets são criados por você e ficam só no seu `.env` local.
-- **Tokens e cache criptografados** com o `safeStorage` do Electron (chaveiro do sistema operacional).
+- **100% local:** there is no author server. Communication goes straight from your computer to the Google/Microsoft APIs.
+- **Your credentials, your machine:** the Client IDs/Secrets are created by you and stay only in your local `.env`.
+- **Encrypted tokens and cache** with Electron's `safeStorage` (the operating system keychain).
 
-## Licença e Termos de Uso
+## License and Terms of Use
 
-Este projeto é de código aberto com condições: veja [TERMOS-DE-USO.md](TERMOS-DE-USO.md).
+This project is open source with conditions: see [TERMS-OF-USE.md](TERMS-OF-USE.md).
 
-- ✅ **Uso pessoal:** livre e gratuito (ler, estudar, modificar, executar).
-- 💰 **Uso comercial/monetização** (venda, assinatura, publicidade, SaaS, distribuição paga, derivados): exige **comunicação prévia ao autor e repasse de 50% do lucro**.
-- 🔁 **Redistribuição:** permitida mantendo os Termos, a atribuição de autoria e a tela de aceite no primeiro acesso.
+- ✅ **Personal use:** free of charge (read, study, modify, run).
+- 💰 **Commercial use/monetization** (sale, subscription, advertising, SaaS, paid distribution, derivatives): requires **notifying the author in advance and sharing 50% of the profit**.
+- 🔁 **Redistribution:** allowed as long as the Terms, the attribution of authorship and the acceptance screen on first use are kept.
 
-Contato para licenciamento comercial: **matheuslajazem@gmail.com**
+Contact for commercial licensing: **matheuslajazem@gmail.com**

@@ -64,7 +64,7 @@ function getAccountWithToken(id) {
 }
 
 function addAccount(account) {
-  // Reconectar a mesma conta substitui a entrada antiga em vez de duplicar.
+  // Reconnecting the same account replaces the old entry instead of duplicating it.
   const accounts = readFile().filter((a) => a.id !== account.id);
   const newAccount = {
     id: account.id,

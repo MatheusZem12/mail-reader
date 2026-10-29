@@ -5,42 +5,42 @@ const path = require('path');
 const { registerIpcHandlers } = require('./src/main/ipc-handlers');
 
 const SHORTCUTS_TEXT = [
-  'Navegação',
-  '  ↑ / ↓            Abrir o e-mail anterior/próximo',
-  '  Shift + ↑ / ↓    Selecionar vários e-mails em sequência',
-  '  Delete           Excluir o e-mail aberto (já abre o próximo)',
+  'Navigation',
+  '  ↑ / ↓            Open the previous/next e-mail',
+  '  Shift + ↑ / ↓    Select several e-mails in a row',
+  '  Delete           Delete the open e-mail (opens the next one)',
   '',
-  'Zoom do corpo do e-mail',
-  '  Ctrl/Cmd + =     Aumentar zoom',
-  '  Ctrl/Cmd + -     Diminuir zoom',
-  '  Ctrl/Cmd + 0     Redefinir zoom',
+  'E-mail body zoom',
+  '  Ctrl/Cmd + =     Zoom in',
+  '  Ctrl/Cmd + -     Zoom out',
+  '  Ctrl/Cmd + 0     Reset zoom',
 ].join('\n');
 
-// Menu enxuto: só o que tem utilidade real (zoom do corpo do e-mail e a
-// referência de atalhos). O menu padrão do Electron (File/Edit/Window/Help)
-// tem principalmente itens de desenvolvimento sem uso para quem usa o app.
+// A lean menu: only what is actually useful (e-mail body zoom and the
+// shortcut reference). Electron's default menu (File/Edit/Window/Help)
+// is mostly development items of no use to whoever uses the app.
 function buildMenu(mainWindow) {
   const sendZoom = (action) => mainWindow.webContents.send('zoom-change', action);
 
   const template = [
     {
-      label: 'Exibir',
+      label: 'View',
       submenu: [
-        { label: 'Aumentar zoom do e-mail', accelerator: 'CmdOrCtrl+=', click: () => sendZoom(0.1) },
-        { label: 'Diminuir zoom do e-mail', accelerator: 'CmdOrCtrl+-', click: () => sendZoom(-0.1) },
-        { label: 'Redefinir zoom do e-mail', accelerator: 'CmdOrCtrl+0', click: () => sendZoom('reset') },
+        { label: 'Zoom in on the e-mail', accelerator: 'CmdOrCtrl+=', click: () => sendZoom(0.1) },
+        { label: 'Zoom out of the e-mail', accelerator: 'CmdOrCtrl+-', click: () => sendZoom(-0.1) },
+        { label: 'Reset e-mail zoom', accelerator: 'CmdOrCtrl+0', click: () => sendZoom('reset') },
       ],
     },
     {
-      label: 'Ajuda',
+      label: 'Help',
       submenu: [
         {
-          label: 'Atalhos de teclado',
+          label: 'Keyboard shortcuts',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'Atalhos de teclado',
-              message: 'Atalhos de teclado',
+              title: 'Keyboard shortcuts',
+              message: 'Keyboard shortcuts',
               detail: SHORTCUTS_TEXT,
             });
           },

@@ -386,7 +386,7 @@ body {
   font-size: 12px;
 }
 
-/* Tutorial na tela de configuração */
+/* Tutorial on the setup screen */
 .settings-instructions {
   margin-top: 16px;
   font-size: 13px;
@@ -444,7 +444,7 @@ body {
   font-size: 12px;
 }
 
-/* Termos de uso */
+/* Terms of use */
 .terms-card {
   max-width: 640px;
   width: 100%;
@@ -476,9 +476,9 @@ body {
   color: var(--error);
 }
 
-/* App header — três faixas: título (esquerda), busca+filtro (centro), ações (direita).
-   O grid 1fr / centro / 1fr mantém o bloco de busca de fato centralizado na
-   barra, independentemente da largura do título e das ações. */
+/* App header — three strips: title (left), search+filter (center), actions (right).
+   The 1fr / center / 1fr grid keeps the search block truly centered in the
+   bar, regardless of the width of the title and the actions. */
 .app-header {
   background: rgba(14, 16, 21, 0.72);
   backdrop-filter: blur(14px);
@@ -502,7 +502,7 @@ body {
   justify-self: start;
 }
 
-/* Busca e botão de filtro sempre lado a lado e centralizados no topbar. */
+/* Search and the filter button always side by side and centered in the top bar. */
 .header-center {
   justify-self: center;
   display: flex;
@@ -569,7 +569,7 @@ body {
   color: var(--text);
 }
 
-/* Busca no header */
+/* Search in the header */
 .search-box {
   flex: 1;
   min-width: 0;
@@ -629,16 +629,16 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-/* Corpo do app: nav de pastas (vertical, na borda esquerda) + split view.
-   A nav fica FORA do .split-view de propósito — assim a largura arrastável da
-   lista continua sendo uma porcentagem só do espaço lista+leitura. */
+/* App body: folder nav (vertical, on the left edge) + split view.
+   The nav sits OUTSIDE .split-view on purpose — that way the list's draggable
+   width stays a percentage of the list+reading space only. */
 .app-body {
   flex: 1;
   display: flex;
   min-height: 0;
 }
 
-/* Split view: lista à esquerda, leitura à direita */
+/* Split view: list on the left, reading on the right */
 .split-view {
   flex: 1;
   display: flex;
@@ -668,9 +668,9 @@ body {
   background: rgba(99, 102, 241, 0.5);
 }
 
-/* Nav de pastas — coluna fixa na esquerda, ao lado da lista de e-mails.
-   Em janelas estreitas ela encolhe para uma faixa só de ícones (o title de
-   cada botão continua dizendo o nome da pasta). */
+/* Folder nav — a fixed column on the left, next to the e-mail list.
+   In narrow windows it shrinks to an icon-only strip (each button's title
+   still says the folder name). */
 .folder-nav {
   flex: 0 0 176px;
   display: flex;
@@ -760,8 +760,8 @@ body {
   }
 }
 
-/* Botão de filtro (funil) no header, ao lado da busca, com popover de
-   calendário + ordem de exibição — só abre quando clicado. */
+/* Filter button (funnel) in the header, next to the search, with a calendar +
+   display order popover — it only opens when clicked. */
 .filter-wrap {
   position: relative;
   flex-shrink: 0;
@@ -971,7 +971,7 @@ body {
   color: var(--warning);
 }
 
-/* Lista de e-mails (linhas compactas) */
+/* E-mail list (compact rows) */
 .email-list {
   flex: 1;
   overflow-y: auto;
@@ -1085,7 +1085,7 @@ body {
   color: var(--text);
 }
 
-/* Ações rápidas da linha (lixeira/restaurar/não é spam) — aparecem no hover */
+/* Quick row actions (trash/restore/not spam) — they show on hover */
 .email-row-actions {
   display: flex;
   align-items: center;
@@ -1111,7 +1111,7 @@ body {
   gap: 4px;
 }
 
-/* Linhas da aba Domínios */
+/* Domains tab rows */
 .domain-row {
   display: flex;
   align-items: center;
@@ -1166,7 +1166,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Aba Automatizador — regras de limpeza salvas */
+/* Automator tab — saved cleanup rules */
 .automation-row {
   display: flex;
   align-items: center;
@@ -1213,8 +1213,8 @@ body {
   margin-top: 2px;
 }
 
-/* Ações da linha: ⚡ executar, ✏️ editar, 🗑 excluir. Cada uma com a cor do
-   que ela faz — antes só existia uma lixeira que na verdade executava. */
+/* Row actions: ⚡ run, ✏️ edit, 🗑 delete. Each with the color of what it
+   does — there used to be only a trash icon that actually ran the rule. */
 .automation-row-actions {
   display: flex;
   align-items: center;
@@ -1238,7 +1238,7 @@ body {
   color: var(--error);
 }
 
-/* Regra desativada: continua legível, mas visivelmente "fora do ar". */
+/* A disabled rule: still readable, but visibly "off the air". */
 .automation-row.off .automation-row-name,
 .automation-row.off .automation-row-line2 {
   color: var(--text-muted);
@@ -1261,7 +1261,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Interruptor liga/desliga (ativar/desativar automação) */
+/* On/off switch (enable/disable automation) */
 .switch {
   position: relative;
   display: inline-block;
@@ -1318,7 +1318,7 @@ body {
   box-shadow: var(--ring);
 }
 
-/* Painel de progresso da execução (uma regra ou todas) */
+/* Run progress pane (one rule or all of them) */
 .run-all-list {
   margin: 12px 0 4px;
   border: 1px solid var(--border);
@@ -1378,7 +1378,7 @@ body {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
-/* Modal de criar/editar automação */
+/* Create/edit automation modal */
 .modal-form {
   width: 480px;
   text-align: left;
@@ -1448,7 +1448,7 @@ body {
   margin: 0 8px 0 0;
 }
 
-/* Painel de leitura */
+/* Reading pane */
 .reading-pane {
   flex: 1;
   overflow-y: auto;
@@ -1549,7 +1549,7 @@ kbd {
   color: var(--text-muted);
 }
 
-/* Conversa inteira empilhada (várias mensagens numa mensagem só, como o Gmail) */
+/* The whole conversation stacked (several messages in one, like Gmail) */
 .thread-messages {
   display: flex;
   flex-direction: column;
@@ -1657,9 +1657,9 @@ kbd {
   color: var(--text);
 }
 
-/* O corpo HTML do e-mail renderiza num iframe "papel": os e-mails são
-   desenhados para fundo claro, então ele fica branco mesmo no tema escuro —
-   como uma folha sobre a mesa (mesma abordagem do Gmail no modo escuro). */
+/* The e-mail's HTML body renders in a "paper" iframe: e-mails are
+   designed for a light background, so it stays white even in the dark theme —
+   like a sheet on a desk (the same approach as Gmail's dark mode). */
 .detail-body-frame {
   display: block;
   width: 100%;
@@ -1704,7 +1704,7 @@ kbd {
   }
 }
 
-/* ---------- Modal de confirmação ---------- */
+/* ---------- Confirmation modal ---------- */
 
 .modal-overlay {
   position: fixed;

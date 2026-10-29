@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# Instala (ou remove) o Mail Reader como um aplicativo do desktop: cria o atalho
-# no menu de aplicativos e registra o ícone. O atalho aponta direto para o
-# código em source/, então qualquer alteração no código já vale no próximo
-# lançamento — não é preciso reinstalar a cada atualização. Rode este script de
-# novo só se trocar o ícone, mover o repositório ou atualizar a versão do Node.
+# Installs (or removes) Mail Reader as a desktop application: creates the launcher
+# in the applications menu and registers the icon. The launcher points straight at
+# the code in source/, so any code change already applies on the next
+# launch — there's no need to reinstall after every update. Run this script
+# again only if you change the icon, move the repository or update the Node version.
 #
-# Uso:
-#   ./install-desktop.sh              instala/atualiza o atalho e o ícone
-#   ./install-desktop.sh --uninstall  remove o atalho e os ícones
+# Usage:
+#   ./install-desktop.sh              installs/updates the launcher and the icon
+#   ./install-desktop.sh --uninstall  removes the launcher and the icons
 set -euo pipefail
 
 APP_ID="mail-reader"
 APP_NAME="Mail Reader"
-COMMENT="Leitor de e-mail local (Gmail e Outlook)"
+COMMENT="Local e-mail reader (Gmail and Outlook)"
 CATEGORIES="Network;Email;"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,17 +31,17 @@ if [[ "${1:-}" == "--uninstall" ]]; then
   rm -f "$ICON_ROOT/scalable/apps/${APP_ID}.svg"
   update-desktop-database "$APP_DIR" 2>/dev/null || true
   gtk-update-icon-cache -f "$ICON_ROOT" 2>/dev/null || true
-  echo "Removido: $APP_NAME"
+  echo "Removed: $APP_NAME"
   exit 0
 fi
 
-# Garante as dependências (o binário standalone do Electron precisa existir).
+# Makes sure the dependencies exist (the standalone Electron binary must be there).
 if [[ ! -x "$ELECTRON" ]]; then
-  echo "Dependências não encontradas — rodando 'npm install' em source/..."
+  echo "Dependencies not found — running 'npm install' in source/..."
   ( cd "$SRC" && npm install )
 fi
 
-# Renderiza o ícone em vários tamanhos + versão vetorial.
+# Renders the icon in several sizes + a vector version.
 for size in 512 256 128 64 48 32; do
   out="$ICON_ROOT/${size}x${size}/apps"
   mkdir -p "$out"
@@ -50,8 +50,8 @@ done
 mkdir -p "$ICON_ROOT/scalable/apps"
 cp "$SVG" "$ICON_ROOT/scalable/apps/${APP_ID}.svg"
 
-# Cria o atalho. O Exec chama o binário standalone do Electron por caminho
-# absoluto, então não depende de node/npm/nvm estarem no PATH da sessão gráfica.
+# Creates the launcher. Exec calls the standalone Electron binary by absolute
+# path, so it doesn't depend on node/npm/nvm being on the graphical session's PATH.
 mkdir -p "$APP_DIR"
 cat > "$DESKTOP" <<EOF
 [Desktop Entry]
@@ -70,6 +70,6 @@ EOF
 update-desktop-database "$APP_DIR" 2>/dev/null || true
 gtk-update-icon-cache -f "$ICON_ROOT" 2>/dev/null || true
 
-echo "Instalado: $APP_NAME"
-echo "  atalho: $DESKTOP"
-echo "  Procure por \"$APP_NAME\" no seu lançador de aplicativos."
+echo "Installed: $APP_NAME"
+echo "  launcher: $DESKTOP"
+echo "  Look for \"$APP_NAME\" in your application launcher."

@@ -1,7 +1,7 @@
 {
   "name": "mail-reader",
   "version": "1.0.0",
-  "description": "Leitor de e-mail local com Electron e Node.js",
+  "description": "A local e-mail reader built with Electron and Node.js",
   "main": "electron.js",
   "scripts": {
     "start": "electron .",

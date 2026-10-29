@@ -2,7 +2,7 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-// Preferências locais do app (ex.: aceite dos Termos de Uso).
+// The app's local preferences (e.g. Terms of Use acceptance).
 const SETTINGS_FILE = 'settings.json';
 
 function getSettingsPath() {

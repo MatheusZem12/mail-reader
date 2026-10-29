@@ -1,6 +1,6 @@
-// Modal de confirmação próprio, no lugar do window.confirm nativo — segue o
-// tema do app e permite rotular o botão de confirmar (ex.: "Excluir").
-export function confirmDialog({ title, message, confirmLabel = 'Confirmar', danger = false }) {
+// Our own confirmation modal, instead of the native window.confirm — it follows
+// the app theme and lets the confirm button be labeled (e.g. "Delete").
+export function confirmDialog({ title, message, confirmLabel = 'Confirm', danger = false }) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -9,7 +9,7 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirmar', dang
         <h3>${escapeHtml(title)}</h3>
         <p>${escapeHtml(message)}</p>
         <div class="modal-actions">
-          <button class="btn btn-ghost" data-action="cancel">Cancelar</button>
+          <button class="btn btn-ghost" data-action="cancel">Cancel</button>
           <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-action="confirm">${escapeHtml(confirmLabel)}</button>
         </div>
       </div>
@@ -37,10 +37,10 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirmar', dang
   });
 }
 
-// Formulário de automação em modal centralizado (antes ficava no painel de
-// leitura, à direita, o que empurrava a lista pro canto e ficava perdido).
-// Resolve com { name, query } ou null se cancelar.
-// `validate` recebe os valores e devolve uma mensagem de erro ou null.
+// The automation form in a centered modal (it used to sit in the reading
+// pane, on the right, which pushed the list into a corner and got lost).
+// Resolves with { name, query } or null if cancelled.
+// `validate` gets the values and returns an error message or null.
 export function automationFormDialog({ rule = null, validate = () => null } = {}) {
   const isEdit = !!rule;
   return new Promise((resolve) => {
@@ -48,29 +48,28 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal modal-form">
-        <h3>${isEdit ? 'Editar automação' : 'Nova automação'}</h3>
+        <h3>${isEdit ? 'Edit automation' : 'New automation'}</h3>
         <div class="form-group">
-          <label for="dlg-rule-name">Nome</label>
-          <input type="text" id="dlg-rule-name" placeholder="Ex.: Bancos" value="${escapeHtml(rule?.name || '')}" autocomplete="off">
+          <label for="dlg-rule-name">Name</label>
+          <input type="text" id="dlg-rule-name" placeholder="E.g. Banks" value="${escapeHtml(rule?.name || '')}" autocomplete="off">
         </div>
         <div class="form-group">
-          <label for="dlg-rule-query">Remetentes</label>
-          <input type="text" id="dlg-rule-query" placeholder="Ex.: santander;btgpactual;kabum" value="${escapeHtml(rule?.query || '')}" autocomplete="off">
+          <label for="dlg-rule-query">Senders</label>
+          <input type="text" id="dlg-rule-query" placeholder="E.g. acmebank;shopco;newsletter" value="${escapeHtml(rule?.query || '')}" autocomplete="off">
           <div class="field-hint">
-            Separe vários com <strong>;</strong> — a automação limpa os e-mails
-            <strong>recebidos de</strong> cada um deles. O endereço de quem enviou é
-            quebrado em <strong>@ . _ -</strong> e algum pedaço tem que ser
-            <strong>igual</strong> ao que você digitar: <em>btgpactual</em> pega
-            <em>@e.btgpactual.com.br</em> e <em>btgpactual@gmail.com</em>, mas
-            <em>btg</em> não pega nada. Maiúsculas e espaços são ignorados
-            (BTG PACTUAL → btgpactual).
+            Separate several with <strong>;</strong> — the automation cleans the e-mails
+            <strong>received from</strong> each of them. The sender's address is split on
+            <strong>@ . _ -</strong> and some piece has to be <strong>equal</strong> to
+            what you type: <em>acmebank</em> catches <em>@e.acmebank.com</em> and
+            <em>acmebank@gmail.com</em>, but <em>acme</em> catches nothing. Case
+            and spaces are ignored (ACME BANK → acmebank).
           </div>
         </div>
         <div class="rule-terms-preview" id="dlg-rule-preview" hidden></div>
         <div class="error-message" id="dlg-rule-error" hidden></div>
         <div class="modal-actions">
-          <button class="btn btn-ghost" data-action="cancel">Cancelar</button>
-          <button class="btn btn-primary" data-action="confirm">${isEdit ? 'Salvar' : 'Criar automação'}</button>
+          <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+          <button class="btn btn-primary" data-action="confirm">${isEdit ? 'Save' : 'Create automation'}</button>
         </div>
       </div>
     `;
@@ -88,8 +87,8 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
       resolve(result);
     };
 
-    // Mostra como o ";" foi interpretado antes de salvar — evita descobrir só
-    // na hora de executar que "itau ;" virou um termo com espaço sobrando.
+    // Shows how the ";" was read before saving — avoids finding out only when
+    // running it that "acme ;" became a term with a stray space.
     const updatePreview = () => {
       const terms = queryInput.value
         .split(';')
@@ -97,7 +96,7 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
         .filter(Boolean);
       previewEl.hidden = terms.length < 2;
       if (terms.length < 2) return;
-      previewEl.innerHTML = `Vai limpar e-mails de ${terms.length} remetentes: ` +
+      previewEl.innerHTML = `It will clean e-mails from ${terms.length} senders: ` +
         terms.map((t) => `<span class="rule-term-chip">${escapeHtml(t)}</span>`).join('');
     };
     queryInput.addEventListener('input', updatePreview);
@@ -121,7 +120,7 @@ export function automationFormDialog({ rule = null, validate = () => null } = {}
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') close(null);
-      // Enter só confirma se o foco está num dos campos — evita disparar sem querer.
+      // Enter only confirms if focus is on one of the fields — avoids firing by accident.
       if (e.key === 'Enter' && (e.target === nameInput || e.target === queryInput)) submit();
     }, { signal: keyController.signal });
 

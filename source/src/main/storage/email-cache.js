@@ -2,20 +2,20 @@ const { app, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-// Cache local de e-mails para evitar requests repetidos às APIs.
+// A local e-mail cache to avoid repeated API requests.
 // Estrutura: { folders: { inbox: { syncedAt, emails }, trash: {...} }, bodies: { id: detail } }
-// Tudo criptografado com safeStorage (mesmo padrão do account-store).
+// Everything encrypted with safeStorage (the same pattern as account-store).
 const CACHE_FILE = 'email-cache.bin';
 
 // v2: linhas por conversa/thread (Gmail Threads API, Outlook agrupado por
-// conversationId) em vez de por mensagem individual — os ids mudaram de
-// formato, então um cache da versão anterior precisa ser descartado.
-// v3: total do Gmail trocou de labels.get().threadsTotal (impreciso pra
-// labels de sistema) para resultSizeEstimate de threads.list — descarta pra
-// não mostrar o total antigo (inflado) até o próximo refresh automático.
-// v4: resultSizeEstimate também é só uma ESTIMATIVA (varia a cada chamada,
-// mesmo sem mutações) — trocado por contagem exata (percorre todas as páginas
-// de ids). Descarta o total antigo, instável, guardado em cache.
+// conversationId) instead of per individual message — the ids changed
+// format, so a cache from the previous version must be dropped.
+// v3: Gmail's total moved from labels.get().threadsTotal (inaccurate for
+// system labels) to threads.list's resultSizeEstimate — dropped so the old
+// (inflated) total doesn't show until the next automatic refresh.
+// v4: resultSizeEstimate is also just an ESTIMATE (it varies on every call,
+// even without mutations) — replaced by an exact count (it walks every page
+// of ids). Drops the old, unstable cached total.
 const SCHEMA_VERSION = 4;
 
 function getCachePath() {
@@ -41,7 +41,7 @@ function readCache() {
   if (!fs.existsSync(filePath)) return null;
   try {
     const cache = JSON.parse(decrypt(fs.readFileSync(filePath, 'utf-8')));
-    // Formato antigo (sem pastas, ou de uma versão de schema anterior): descarta, será ressincronizado
+    // Old format (no folders, or from an earlier schema version): dropped, it will be resynced
     if (!cache.folders) return null;
     if (cache.schemaVersion !== SCHEMA_VERSION) return null;
     return cache;
@@ -61,8 +61,8 @@ function emptyCache() {
 function getList(folder) {
   const entry = readCache()?.folders?.[folder];
   if (!entry || !Array.isArray(entry.emails)) return null;
-  // Cache salvo antes de hasMore/total existirem: assume que pode ter mais e
-  // usa a quantidade carregada como total (melhor do que não mostrar nada).
+  // A cache saved before hasMore/total existed: assumes there may be more and
+  // uses the loaded count as the total (better than showing nothing).
   return {
     emails: entry.emails,
     syncedAt: entry.syncedAt || 0,
@@ -75,7 +75,7 @@ function saveList(folder, emails, hasMore = true, total = null) {
   const cache = readCache() || emptyCache();
   cache.folders[folder] = { syncedAt: Date.now(), emails, hasMore, total: total ?? emails.length };
 
-  // Poda corpos de e-mails que não estão em nenhuma pasta, para o arquivo não crescer sem limite.
+  // Prunes bodies of e-mails that aren't in any folder, so the file doesn't grow without limit.
   const validIds = new Set(
     Object.values(cache.folders).flatMap((entry) => (entry.emails || []).map((e) => e.id))
   );
@@ -100,8 +100,8 @@ function saveBody(emailId, detail) {
   writeCache(cache);
 }
 
-// Move os resumos entre pastas do cache (ex.: excluir = inbox → trash),
-// mantendo a troca de aba instantânea sem novo request.
+// Moves the summaries between cache folders (e.g. delete = inbox → trash),
+// keeping tab switches instant without a new request.
 function moveEmails(ids, fromFolder, toFolder) {
   const cache = readCache();
   if (!cache) return;
@@ -141,7 +141,7 @@ function removeEmails(ids) {
   writeCache(cache);
 }
 
-// Esvazia uma pasta inteira do cache local (usado depois de "esvaziar lixeira").
+// Empties a whole folder of the local cache (used after "empty trash").
 function clearFolder(folder) {
   const cache = readCache();
   if (!cache) return;

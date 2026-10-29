@@ -10,8 +10,8 @@ const appSettings = require('./storage/app-settings');
 const automationStore = require('./storage/automation-store');
 const emailService = require('./email-service');
 
-// Incrementar quando os TERMOS-DE-USO.md mudarem: força novo aceite.
-const TERMS_VERSION = 1;
+// Bump when TERMS-OF-USE.md changes: it forces a new acceptance.
+const TERMS_VERSION = 2;
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
@@ -34,11 +34,11 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('get-terms', () => {
     const settings = appSettings.getSettings();
-    let text = 'Termos de Uso não encontrados (TERMOS-DE-USO.md).';
+    let text = 'Terms of Use not found (TERMS-OF-USE.md).';
     try {
-      // TERMOS-DE-USO.md fica na raiz do projeto; app.getAppPath() aponta pra
-      // source/ (onde está o package.json), um nível abaixo da raiz.
-      text = fs.readFileSync(path.join(app.getAppPath(), '..', 'TERMOS-DE-USO.md'), 'utf-8');
+      // TERMS-OF-USE.md lives at the project root; app.getAppPath() points to
+      // source/ (where package.json is), one level below the root.
+      text = fs.readFileSync(path.join(app.getAppPath(), '..', 'TERMS-OF-USE.md'), 'utf-8');
     } catch {}
     return {
       accepted: (settings.termsAcceptedVersion || 0) >= TERMS_VERSION,
@@ -55,7 +55,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('decline-terms', () => {
-    // Recusou os termos: não pode usar o app.
+    // Declined the terms: the app can't be used.
     app.quit();
   });
 
@@ -73,7 +73,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('open-external', (_event, url) => {
-    // Só abre links http(s) — evita abrir esquemas arbitrários (file:, etc).
+    // Only opens http(s) links — avoids opening arbitrary schemes (file:, etc).
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
       return shell.openExternal(url);
     }
@@ -93,7 +93,7 @@ function registerIpcHandlers() {
       accountStore.addAccount(account);
       return { success: true, account: { id: account.id, email: account.email, provider: account.provider, name: account.name } };
     } catch (err) {
-      throw new Error(err.message || 'Erro ao autenticar com Google');
+      throw new Error(err.message || 'Error signing in with Google');
     }
   });
 
@@ -103,7 +103,7 @@ function registerIpcHandlers() {
       accountStore.addAccount(account);
       return { success: true, account: { id: account.id, email: account.email, provider: account.provider, name: account.name } };
     } catch (err) {
-      throw new Error(err.message || 'Erro ao autenticar com Microsoft');
+      throw new Error(err.message || 'Error signing in with Microsoft');
     }
   });
 
@@ -111,7 +111,7 @@ function registerIpcHandlers() {
     try {
       return await emailService.listEmails(options);
     } catch (err) {
-      throw new Error(err.message || 'Erro ao listar e-mails');
+      throw new Error(err.message || 'Error listing e-mails');
     }
   });
 
@@ -119,7 +119,7 @@ function registerIpcHandlers() {
     try {
       return await emailService.listDomains(options);
     } catch (err) {
-      throw new Error(err.message || 'Erro ao listar domínios');
+      throw new Error(err.message || 'Error listing domains');
     }
   });
 
@@ -127,7 +127,7 @@ function registerIpcHandlers() {
     try {
       return await emailService.getEmail(emailId);
     } catch (err) {
-      throw new Error(err.message || 'Erro ao carregar e-mail');
+      throw new Error(err.message || 'Error loading the e-mail');
     }
   });
 
@@ -136,7 +136,7 @@ function registerIpcHandlers() {
       await emailService.deleteEmail(emailId, options);
       return { success: true };
     } catch (err) {
-      throw new Error(err.message || 'Erro ao excluir e-mail');
+      throw new Error(err.message || 'Error deleting the e-mail');
     }
   });
 
@@ -145,7 +145,7 @@ function registerIpcHandlers() {
       await emailService.restoreEmail(emailId, options);
       return { success: true };
     } catch (err) {
-      throw new Error(err.message || 'Erro ao restaurar e-mail');
+      throw new Error(err.message || 'Error restoring the e-mail');
     }
   });
 
@@ -154,7 +154,7 @@ function registerIpcHandlers() {
       await emailService.emptyTrash();
       return { success: true };
     } catch (err) {
-      throw new Error(err.message || 'Erro ao esvaziar a lixeira');
+      throw new Error(err.message || 'Error emptying the trash');
     }
   });
 

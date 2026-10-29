@@ -13,7 +13,7 @@ function getClient() {
   const clientId = oauthConfig.getClientId('microsoft');
   if (!clientId) {
     throw new Error(
-      'Microsoft OAuth não configurado. Defina MAIL_READER_MICROSOFT_CLIENT_ID no arquivo .env (veja o README).'
+      'Microsoft OAuth is not configured. Set MAIL_READER_MICROSOFT_CLIENT_ID in the .env file (see the README).'
     );
   }
   return new PublicClientApplication({
@@ -33,16 +33,16 @@ function startCallbackServer() {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       if (code) {
-        res.end('<h1>Autorização concluída!</h1><p>Você pode fechar esta janela.</p>');
+        res.end('<h1>Authorization complete!</h1><p>You can close this window.</p>');
         server.close(() => resolve(code));
       } else {
-        res.end(`<h1>Erro na autorização</h1><p>${error || 'Desconhecido'}</p>`);
-        server.close(() => reject(new Error(error || 'Autorização negada')));
+        res.end(`<h1>Authorization error</h1><p>${error || 'Unknown'}</p>`);
+        server.close(() => reject(new Error(error || 'Authorization denied')));
       }
     });
 
     server.listen(REDIRECT_PORT, () => {
-      console.log('Aguardando callback Microsoft na porta', REDIRECT_PORT);
+      console.log('Waiting for the Microsoft callback on port', REDIRECT_PORT);
     });
 
     server.on('error', reject);
@@ -106,11 +106,11 @@ function generatePkce() {
 }
 
 async function graphRequest(pathOrUrl, accessToken, options = {}) {
-  // Páginas seguintes vêm como URL completa em @odata.nextLink; a primeira
-  // chamada usa um path relativo.
+  // Later pages come as a full URL in @odata.nextLink; the first
+  // call uses a relative path.
   const url = /^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : `https://graph.microsoft.com/v1.0${pathOrUrl}`;
-  // Mescla headers em vez de deixar options.headers substituir o objeto todo
-  // (senão um Authorization mandado por engano em options apagaria o token).
+  // Merges headers instead of letting options.headers replace the whole object
+  // (otherwise an Authorization sent by mistake in options would wipe the token).
   const { headers: extraHeaders, ...restOptions } = options;
   const response = await fetch(url, {
     ...restOptions,
